@@ -10,7 +10,7 @@
           "verify_ssl": "Zertifikat des Servers prüfen"
         },
         "data_description": {
-          "url": "Zum Beispiel http://192.168.1.50:3000 oder https://sprout.example.com",
+          "url": "Die Adresse, unter der Sprout Track im Browser geöffnet wird, mit http oder https und dem Port",
           "api_key": "Beginnt mit st_live_ und wird nur einmal beim Anlegen angezeigt",
           "verify_ssl": "Nur bei einem selbst signierten HTTPS-Zertifikat ausschalten"
         }
@@ -30,7 +30,7 @@
           "verify_ssl": "Zertifikat des Servers prüfen"
         },
         "data_description": {
-          "url": "Zum Beispiel http://192.168.1.50:3000 oder https://sprout.example.com",
+          "url": "Die Adresse, unter der Sprout Track im Browser geöffnet wird, mit http oder https und dem Port",
           "api_key": "Beginnt mit st_live_ und wird nur einmal beim Anlegen angezeigt",
           "verify_ssl": "Nur bei einem selbst signierten HTTPS-Zertifikat ausschalten"
         }
