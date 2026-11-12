@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-First version, not released yet (`manifest.json` says 0.1.0).
+## v0.1.0 — 2026-11-12
+
+First release.
 
 ### Added
 
