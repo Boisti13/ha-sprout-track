@@ -1,0 +1,142 @@
+# Fields shared by the actions:
+#   device_id  the baby (optional while only one baby is set up)
+#   time       when it happened (default: now)
+#   caretaker  name of a caretaker in Sprout Track
+
+log_diaper:
+  fields:
+    device_id: &baby
+      selector:
+        device:
+          integration: sprout_track
+    diaper_type:
+      required: true
+      default: wet
+      selector:
+        select:
+          translation_key: diaper_type
+          options: [wet, dirty, both, dry]
+    condition:
+      selector:
+        select:
+          translation_key: diaper_condition
+          options: [normal, loose, firm, other]
+    color:
+      selector:
+        select:
+          translation_key: diaper_color
+          options: [yellow, brown, green, black, red, other]
+    blowout:
+      selector:
+        boolean:
+    cream_applied:
+      selector:
+        boolean:
+    notes: &notes
+      selector:
+        text:
+          multiline: true
+    time: &time
+      selector:
+        datetime:
+    caretaker: &caretaker
+      selector:
+        text:
+
+start_sleep:
+  fields:
+    device_id: *baby
+    sleep_type: &sleep_type
+      default: nap
+      selector:
+        select:
+          translation_key: sleep_type
+          options: [nap, night_sleep]
+    location: &location
+      example: Crib
+      selector:
+        text:
+    notes: *notes
+    time: *time
+    caretaker: *caretaker
+
+end_sleep:
+  fields:
+    device_id: *baby
+    sleep_type:
+      selector:
+        select:
+          translation_key: sleep_type
+          options: [nap, night_sleep]
+    quality: &quality
+      selector:
+        select:
+          translation_key: sleep_quality
+          options: [poor, fair, good, excellent]
+    notes: *notes
+    time: *time
+    caretaker: *caretaker
+
+log_sleep:
+  fields:
+    device_id: *baby
+    sleep_type: *sleep_type
+    duration:
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 1440
+          unit_of_measurement: min
+          mode: box
+    location: *location
+    quality: *quality
+    notes: *notes
+    time: *time
+    caretaker: *caretaker
+
+log_medicine:
+  fields:
+    device_id: *baby
+    medicine:
+      required: true
+      example: Paracetamol
+      selector:
+        text:
+    amount: &amount
+      selector:
+        number:
+          min: 0
+          max: 10000
+          step: any
+          mode: box
+    unit: &unit
+      example: ML
+      selector:
+        text:
+    notes: *notes
+    time: *time
+    caretaker: *caretaker
+
+log_supplement:
+  fields:
+    device_id: *baby
+    supplement:
+      required: true
+      example: Vitamin D
+      selector:
+        text:
+    amount: *amount
+    unit: *unit
+    notes: *notes
+    time: *time
+    caretaker: *caretaker
+
+log_activity:
+  fields:
+    device_id: *baby
+    data:
+      required: true
+      example: '{"type": "feed", "feedType": "formula", "amount": 120, "unitAbbr": "ML"}'
+      selector:
+        object:

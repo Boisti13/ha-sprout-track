@@ -1,0 +1,56 @@
+# Working on this repository
+
+Home Assistant custom integration (HACS) for
+[Sprout Track](https://github.com/Oak-and-Sprout/sprout-track), a
+self-hosted baby tracker. It talks to Sprout Track's hooks API
+(`/api/hooks/v1`, documented upstream in
+`documentation/Admin-Documentation/webhook-api.md`). Public repository,
+MIT: other Sprout Track users install it, so nothing in it may assume the
+owner's setup.
+
+- **Branches:** `dev` for work, `main` for releases. Push to `dev`; merge
+  to `main` and release only when the owner asks.
+- **Keep the domain `sprout_track`** and the unique IDs
+  (`<baby id>_<key>`): changing either makes Home Assistant create new
+  devices and entities for every user. Renaming an entity's `key` is the
+  same thing; change `translation_key` and the texts instead.
+- **Never real data.** No names, IDs, keys, addresses or screenshots from
+  the owner's own Sprout Track (real family data). Fixtures in
+  `tests/fixtures/` are recorded from the test instance and anonymised
+  (`baby-1`, `family-1`, Emma/Mia Sample). README screenshots, if any,
+  come from the test instance.
+- **Layout:** `api.py` is the HTTP client (no Home Assistant imports);
+  `coordinator.py` polls `/babies`, each baby's `/status` every interval
+  and `/measurements/latest` every 15 min, into one `BabyData` per baby;
+  `entity.py` has the base entity and `add_entities_per_baby()` (babies
+  come and go without a reload); `sensor.py`, `binary_sensor.py`,
+  `button.py` are description tables; `services.py` holds the actions and
+  the two helpers the buttons share (`async_log_activity`,
+  `async_start_sleep`).
+- **A new entity or action** needs: the description or handler, texts in
+  **both** `translations/en.json` and `de.json`, an icon in `icons.json`,
+  for actions the fields in `services.yaml`, a test, a README table row
+  and a CHANGELOG line. `test_translations_cover_everything` fails when
+  texts, icons or fields are missing.
+- **Timestamps, not "minutes ago".** The API's `minutesAgo` changes every
+  minute; sensors expose the time instead and Home Assistant shows
+  "5 minutes ago" itself. Don't add counters that tick.
+- **API limits:** 60 reads and 30 writes per minute per key. One poll is
+  1 + number of babies requests; keep it that way (measurements and
+  reference data are fetched rarely or on demand).
+- **Tests:** venv with Python 3.14 outside the repo
+  (`uv venv --python 3.14 ~/.venvs/sprout-track-ha`,
+  `uv pip install -r requirements_test.txt`), then
+  `~/.venvs/sprout-track-ha/bin/python -m pytest -q` and
+  `ruff check . && ruff format --check .`. All must pass before a push.
+- **Trying it for real:** the owner's test Sprout Track (no real data; where it
+  runs is in the owner's private notes) plus a throwaway Home Assistant from the
+  same venv (`hass -c <scratch dir>` with `custom_components/sprout_track`
+  linked in). Not against the live Sprout Track, and installing it in the
+  owner's Home Assistant is the owner's call.
+- **Release:** bump `version` in `manifest.json`, move *Unreleased* in
+  `CHANGELOG.md` to `## vX.Y.Z — date`, merge to `main`, tag `vX.Y.Z`,
+  `gh release create vX.Y.Z --verify-tag --notes-file <that section>`.
+  HACS installs from releases once one exists.
+- README and CHANGELOG follow the owner's house style; update both with
+  every user-visible change.

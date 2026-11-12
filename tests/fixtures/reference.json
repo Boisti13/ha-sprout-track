@@ -1,0 +1,215 @@
+{
+  "success": true,
+  "data": {
+    "medicines": [
+      {
+        "id": "med-0001",
+        "name": "Paracetamol",
+        "typicalDoseSize": 2.5,
+        "unitAbbr": "ML",
+        "isSupplement": false
+      }
+    ],
+    "supplements": [
+      {
+        "id": "med-0002",
+        "name": "Vitamin D",
+        "typicalDoseSize": 1,
+        "unitAbbr": "DROP",
+        "isSupplement": true
+      }
+    ],
+    "sleepLocations": [
+      "Bassinet",
+      "Stroller",
+      "Crib",
+      "Car Seat",
+      "Parents Room",
+      "Contact",
+      "Other"
+    ],
+    "playCategories": [],
+    "feedTypes": [
+      {
+        "value": "BREAST",
+        "description": "Breastfeeding"
+      },
+      {
+        "value": "BOTTLE",
+        "description": "Bottle (specify bottleType separately)"
+      },
+      {
+        "value": "SOLIDS",
+        "description": "Solid food (legacy; stored as a food entry, prefer activity type \"food\")"
+      },
+      {
+        "value": "formula",
+        "description": "Formula bottle (auto-sets BOTTLE + formula)"
+      },
+      {
+        "value": "breast milk",
+        "description": "Pumped breast milk bottle"
+      },
+      {
+        "value": "milk",
+        "description": "Milk bottle"
+      },
+      {
+        "value": "other",
+        "description": "Other bottle type"
+      }
+    ],
+    "diaperConditions": [
+      "NORMAL",
+      "LOOSE",
+      "FIRM",
+      "OTHER"
+    ],
+    "diaperColors": [
+      "YELLOW",
+      "BROWN",
+      "GREEN",
+      "BLACK",
+      "RED",
+      "OTHER"
+    ],
+    "sleepQualities": [
+      "POOR",
+      "FAIR",
+      "GOOD",
+      "EXCELLENT"
+    ],
+    "bathTypes": [
+      "Full Bath",
+      "Sponge Bath",
+      "Wipe Down"
+    ],
+    "units": [
+      {
+        "unitAbbr": "C",
+        "unitName": "Celsius"
+      },
+      {
+        "unitAbbr": "CAP",
+        "unitName": "Cap"
+      },
+      {
+        "unitAbbr": "CC",
+        "unitName": "Cubic Centimeters"
+      },
+      {
+        "unitAbbr": "CM",
+        "unitName": "Centimeters"
+      },
+      {
+        "unitAbbr": "CREAM",
+        "unitName": "Cream"
+      },
+      {
+        "unitAbbr": "DOSE",
+        "unitName": "Dose"
+      },
+      {
+        "unitAbbr": "DROP",
+        "unitName": "Drops"
+      },
+      {
+        "unitAbbr": "F",
+        "unitName": "Fahrenheit"
+      },
+      {
+        "unitAbbr": "G",
+        "unitName": "Grams"
+      },
+      {
+        "unitAbbr": "IN",
+        "unitName": "Inches"
+      },
+      {
+        "unitAbbr": "INHALER",
+        "unitName": "Inhaler"
+      },
+      {
+        "unitAbbr": "INJECTION",
+        "unitName": "Injection"
+      },
+      {
+        "unitAbbr": "KG",
+        "unitName": "Kilograms"
+      },
+      {
+        "unitAbbr": "L",
+        "unitName": "Liters"
+      },
+      {
+        "unitAbbr": "LB",
+        "unitName": "Pounds"
+      },
+      {
+        "unitAbbr": "MCG",
+        "unitName": "Micrograms"
+      },
+      {
+        "unitAbbr": "MG",
+        "unitName": "Milligrams"
+      },
+      {
+        "unitAbbr": "ML",
+        "unitName": "Milliliters"
+      },
+      {
+        "unitAbbr": "MMOL",
+        "unitName": "Millimoles"
+      },
+      {
+        "unitAbbr": "MOL",
+        "unitName": "Moles"
+      },
+      {
+        "unitAbbr": "OINTMENT",
+        "unitName": "Ointment"
+      },
+      {
+        "unitAbbr": "OZ",
+        "unitName": "Ounces"
+      },
+      {
+        "unitAbbr": "PATCH",
+        "unitName": "Patch"
+      },
+      {
+        "unitAbbr": "PILL",
+        "unitName": "Pill"
+      },
+      {
+        "unitAbbr": "SPRAY",
+        "unitName": "Spray"
+      },
+      {
+        "unitAbbr": "SUPPOSITORY",
+        "unitName": "Suppository"
+      },
+      {
+        "unitAbbr": "TAB",
+        "unitName": "Tab"
+      },
+      {
+        "unitAbbr": "TBSP",
+        "unitName": "Tablespoon"
+      }
+    ],
+    "foods": [],
+    "foodEnjoyments": [
+      "HATED",
+      "DISLIKED",
+      "NEUTRAL",
+      "LIKED",
+      "LOVED"
+    ]
+  },
+  "meta": {
+    "timestamp": "2026-11-12T18:45:15.625Z",
+    "familyId": "family-1",
+    "babyId": "baby-1"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "entity": {
+    "sensor": {
+      "last_feed": { "default": "mdi:baby-bottle-outline" },
+      "last_diaper": { "default": "mdi:human-baby-changing-table" },
+      "sleep_state": {
+        "default": "mdi:sleep",
+        "state": { "awake": "mdi:sleep-off", "night_sleep": "mdi:weather-night" }
+      },
+      "asleep_since": { "default": "mdi:sleep" },
+      "awake_since": { "default": "mdi:sleep-off" },
+      "last_sleep_duration": { "default": "mdi:timer-sand-complete" },
+      "last_bath": { "default": "mdi:bathtub-outline" },
+      "last_medicine": { "default": "mdi:pill" },
+      "last_supplement": { "default": "mdi:eyedropper" },
+      "last_pump": { "default": "mdi:mother-nurse" },
+      "feeds_today": { "default": "mdi:baby-bottle-outline" },
+      "diapers_today": { "default": "mdi:human-baby-changing-table" },
+      "wet_diapers_today": { "default": "mdi:water-outline" },
+      "dirty_diapers_today": { "default": "mdi:emoticon-poop" },
+      "sleep_today": { "default": "mdi:sleep" },
+      "naps_today": { "default": "mdi:sleep" },
+      "baths_today": { "default": "mdi:bathtub-outline" },
+      "medicines_today": { "default": "mdi:pill" },
+      "supplements_today": { "default": "mdi:eyedropper" },
+      "age": { "default": "mdi:cake-variant-outline" },
+      "weight": { "default": "mdi:scale-baby" },
+      "height": { "default": "mdi:human-male-height" },
+      "head_circumference": { "default": "mdi:tape-measure" }
+    },
+    "binary_sensor": {
+      "sleeping": { "default": "mdi:sleep-off", "state": { "on": "mdi:sleep" } },
+      "feed_overdue": { "default": "mdi:baby-bottle-outline" },
+      "diaper_overdue": { "default": "mdi:human-baby-changing-table" },
+      "breastfeeding": { "default": "mdi:mother-nurse" },
+      "pumping": { "default": "mdi:mother-nurse" }
+    },
+    "button": {
+      "log_wet_diaper": { "default": "mdi:water-outline" },
+      "log_dirty_diaper": { "default": "mdi:emoticon-poop" },
+      "log_wet_and_dirty_diaper": { "default": "mdi:human-baby-changing-table" },
+      "start_nap": { "default": "mdi:sleep" },
+      "start_night_sleep": { "default": "mdi:weather-night" },
+      "end_sleep": { "default": "mdi:sleep-off" }
+    }
+  },
+  "services": {
+    "log_diaper": { "service": "mdi:human-baby-changing-table" },
+    "start_sleep": { "service": "mdi:sleep" },
+    "end_sleep": { "service": "mdi:sleep-off" },
+    "log_sleep": { "service": "mdi:sleep" },
+    "log_medicine": { "service": "mdi:pill" },
+    "log_supplement": { "service": "mdi:eyedropper" },
+    "log_activity": { "service": "mdi:notebook-plus-outline" }
+  }
+}

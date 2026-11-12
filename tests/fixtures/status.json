@@ -1,0 +1,79 @@
+{
+  "success": true,
+  "data": {
+    "baby": {
+      "id": "baby-1",
+      "firstName": "Emma",
+      "ageInDays": 11
+    },
+    "lastActivities": {
+      "feed": {
+        "id": "8f950930-5e86-446c-879d-1a2e9706f649",
+        "time": "2026-11-12T13:38:21.867Z",
+        "minutesAgo": 306,
+        "type": "BOTTLE",
+        "amount": 120,
+        "unitAbbr": "ML",
+        "bottleType": "Formula",
+        "caretakerName": null
+      },
+      "diaper": {
+        "id": "ca918425-d40c-4573-b87f-3f5bc6bb82d4",
+        "time": "2026-11-12T13:38:21.854Z",
+        "minutesAgo": 306,
+        "type": "WET",
+        "caretakerName": null
+      },
+      "sleep": {
+        "id": "f338a232-bc73-4d43-9708-10ea7b5d58e4",
+        "startTime": "2026-11-12T09:00:00.000Z",
+        "endTime": "2026-11-12T09:45:00.000Z",
+        "minutesAgo": 540,
+        "duration": 45,
+        "type": "NAP",
+        "isActive": false
+      },
+      "bath": {
+        "time": "2026-11-12T13:38:21.946Z",
+        "minutesAgo": 306,
+        "bathType": null
+      },
+      "medicine": {
+        "time": "2026-11-12T13:38:21.893Z",
+        "minutesAgo": 306,
+        "medicineName": "Paracetamol"
+      },
+      "supplement": {
+        "time": "2026-11-12T13:38:21.908Z",
+        "minutesAgo": 306,
+        "supplementName": "Vitamin D"
+      },
+      "pump": null
+    },
+    "activeFeed": null,
+    "dailyCounts": {
+      "date": "2026-11-12",
+      "feeds": 1,
+      "diapers": 1,
+      "diapersByType": {
+        "WET": 1
+      },
+      "sleepMinutes": 45,
+      "naps": 1,
+      "baths": 1,
+      "medicines": 1,
+      "supplements": 1
+    },
+    "warnings": {
+      "feedOverdue": true,
+      "feedMinutesSinceWarning": 186,
+      "diaperOverdue": true,
+      "diaperMinutesSinceWarning": 126
+    }
+  },
+  "meta": {
+    "timestamp": "2026-11-12T18:45:15.574Z",
+    "familyId": "family-1",
+    "babyId": "baby-1"
+  }
+}

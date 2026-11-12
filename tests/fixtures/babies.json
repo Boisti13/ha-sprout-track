@@ -1,0 +1,33 @@
+{
+  "success": true,
+  "data": {
+    "babies": [
+      {
+        "id": "baby-1",
+        "firstName": "Emma",
+        "lastName": "Sample",
+        "birthDate": "2026-10-31",
+        "ageInDays": 11,
+        "ageFormatted": "11 days",
+        "gender": "MALE",
+        "feedWarningTime": "02:00",
+        "diaperWarningTime": "03:00"
+      },
+      {
+        "id": "baby-2",
+        "firstName": "Mia",
+        "lastName": "Sample",
+        "birthDate": "2026-06-15",
+        "ageInDays": 150,
+        "ageFormatted": "5 months, 0 days",
+        "gender": "FEMALE",
+        "feedWarningTime": "03:00",
+        "diaperWarningTime": "02:00"
+      }
+    ]
+  },
+  "meta": {
+    "timestamp": "2026-11-12T18:45:15.550Z",
+    "familyId": "family-1"
+  }
+}

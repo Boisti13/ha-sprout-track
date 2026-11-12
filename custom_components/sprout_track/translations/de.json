@@ -1,0 +1,480 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mit Sprout Track verbinden",
+        "description": "Lege in Sprout Track unter **Einstellungen → Admin → Integrationen** einen API-Schlüssel an. Er braucht das Recht *read* für die Sensoren und *write* für die Tasten und Aktionen.",
+        "data": {
+          "url": "Adresse von Sprout Track",
+          "api_key": "API-Schlüssel",
+          "verify_ssl": "Zertifikat des Servers prüfen"
+        },
+        "data_description": {
+          "url": "Zum Beispiel http://192.168.1.50:3000 oder https://sprout.example.com",
+          "api_key": "Beginnt mit st_live_ und wird nur einmal beim Anlegen angezeigt",
+          "verify_ssl": "Nur bei einem selbst signierten HTTPS-Zertifikat ausschalten"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Neuer API-Schlüssel für Sprout Track",
+        "description": "Sprout Track unter {url} nimmt den API-Schlüssel nicht mehr an (widerrufen, abgelaufen oder ohne das Recht read). Lege unter **Einstellungen → Admin → Integrationen** einen neuen an.",
+        "data": {
+          "api_key": "API-Schlüssel"
+        }
+      },
+      "reconfigure": {
+        "title": "Verbindung zu Sprout Track ändern",
+        "data": {
+          "url": "Adresse von Sprout Track",
+          "api_key": "API-Schlüssel",
+          "verify_ssl": "Zertifikat des Servers prüfen"
+        },
+        "data_description": {
+          "url": "Zum Beispiel http://192.168.1.50:3000 oder https://sprout.example.com",
+          "api_key": "Beginnt mit st_live_ und wird nur einmal beim Anlegen angezeigt",
+          "verify_ssl": "Nur bei einem selbst signierten HTTPS-Zertifikat ausschalten"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unter dieser Adresse antwortet kein Sprout Track. Adresse und Port prüfen.",
+      "invalid_auth": "Sprout Track nimmt diesen API-Schlüssel nicht an.",
+      "invalid_url": "Die vollständige Adresse eingeben, beginnend mit http:// oder https://",
+      "https_required": "Sprout Track erlaubt unverschlüsseltes http:// nur für private IP-Adressen und localhost. Die IP-Adresse oder eine https://-Adresse verwenden.",
+      "read_scope_required": "Diesem API-Schlüssel fehlt das Recht read.",
+      "unknown": "Unerwarteter Fehler. Einzelheiten stehen im Home-Assistant-Protokoll."
+    },
+    "abort": {
+      "already_configured": "Diese Sprout-Track-Familie ist bereits eingerichtet.",
+      "reauth_successful": "Der neue API-Schlüssel funktioniert.",
+      "reconfigure_successful": "Die Verbindung wurde geändert.",
+      "wrong_family": "Dieser API-Schlüssel gehört zu einer anderen Familie als der hier eingerichteten."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Aktualisieren alle"
+        },
+        "data_description": {
+          "scan_interval": "Jede Aktualisierung braucht eine Anfrage plus eine je Baby; Sprout Track erlaubt 60 pro Minute und Schlüssel."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "last_feed": {
+        "name": "Letzte Mahlzeit"
+      },
+      "last_diaper": {
+        "name": "Letzte Windel"
+      },
+      "sleep_state": {
+        "name": "Schlafzustand",
+        "state": {
+          "awake": "Wach",
+          "nap": "Nickerchen",
+          "night_sleep": "Nachtschlaf",
+          "asleep": "Schläft"
+        }
+      },
+      "asleep_since": {
+        "name": "Schläft seit"
+      },
+      "awake_since": {
+        "name": "Wach seit"
+      },
+      "last_sleep_duration": {
+        "name": "Dauer des letzten Schlafs"
+      },
+      "last_bath": {
+        "name": "Letztes Bad"
+      },
+      "last_medicine": {
+        "name": "Letztes Medikament"
+      },
+      "last_supplement": {
+        "name": "Letztes Nahrungsergänzungsmittel"
+      },
+      "last_pump": {
+        "name": "Letztes Abpumpen"
+      },
+      "feeds_today": {
+        "name": "Mahlzeiten heute"
+      },
+      "diapers_today": {
+        "name": "Windeln heute"
+      },
+      "wet_diapers_today": {
+        "name": "Nasse Windeln heute"
+      },
+      "dirty_diapers_today": {
+        "name": "Volle Windeln heute"
+      },
+      "sleep_today": {
+        "name": "Schlaf heute"
+      },
+      "naps_today": {
+        "name": "Nickerchen heute"
+      },
+      "baths_today": {
+        "name": "Bäder heute"
+      },
+      "medicines_today": {
+        "name": "Medikamente heute"
+      },
+      "supplements_today": {
+        "name": "Nahrungsergänzungsmittel heute"
+      },
+      "age": {
+        "name": "Alter"
+      },
+      "weight": {
+        "name": "Gewicht"
+      },
+      "height": {
+        "name": "Größe"
+      },
+      "head_circumference": {
+        "name": "Kopfumfang"
+      },
+      "temperature": {
+        "name": "Temperatur"
+      }
+    },
+    "binary_sensor": {
+      "sleeping": {
+        "name": "Schläft"
+      },
+      "feed_overdue": {
+        "name": "Mahlzeit überfällig"
+      },
+      "diaper_overdue": {
+        "name": "Windel überfällig"
+      },
+      "breastfeeding": {
+        "name": "Stillen"
+      },
+      "pumping": {
+        "name": "Abpumpen"
+      }
+    },
+    "button": {
+      "log_wet_diaper": {
+        "name": "Nasse Windel eintragen"
+      },
+      "log_dirty_diaper": {
+        "name": "Volle Windel eintragen"
+      },
+      "log_wet_and_dirty_diaper": {
+        "name": "Nasse und volle Windel eintragen"
+      },
+      "start_nap": {
+        "name": "Nickerchen starten"
+      },
+      "start_night_sleep": {
+        "name": "Nachtschlaf starten"
+      },
+      "end_sleep": {
+        "name": "Schlaf beenden"
+      }
+    }
+  },
+  "selector": {
+    "diaper_type": {
+      "options": {
+        "wet": "Nass",
+        "dirty": "Voll",
+        "both": "Nass und voll",
+        "dry": "Trocken"
+      }
+    },
+    "diaper_condition": {
+      "options": {
+        "normal": "Normal",
+        "loose": "Weich",
+        "firm": "Fest",
+        "other": "Anders"
+      }
+    },
+    "diaper_color": {
+      "options": {
+        "yellow": "Gelb",
+        "brown": "Braun",
+        "green": "Grün",
+        "black": "Schwarz",
+        "red": "Rot",
+        "other": "Anders"
+      }
+    },
+    "sleep_type": {
+      "options": {
+        "nap": "Nickerchen",
+        "night_sleep": "Nachtschlaf"
+      }
+    },
+    "sleep_quality": {
+      "options": {
+        "poor": "Schlecht",
+        "fair": "Mäßig",
+        "good": "Gut",
+        "excellent": "Sehr gut"
+      }
+    }
+  },
+  "services": {
+    "log_diaper": {
+      "name": "Windel eintragen",
+      "description": "Trägt einen Windelwechsel ein.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Kann entfallen, solange nur ein Baby eingerichtet ist."
+        },
+        "diaper_type": {
+          "name": "Art",
+          "description": "Was in der Windel war."
+        },
+        "condition": {
+          "name": "Beschaffenheit",
+          "description": "Konsistenz des Stuhls."
+        },
+        "color": {
+          "name": "Farbe",
+          "description": "Farbe des Stuhls."
+        },
+        "blowout": {
+          "name": "Ausgelaufen",
+          "description": "Die Windel ist ausgelaufen."
+        },
+        "cream_applied": {
+          "name": "Creme aufgetragen",
+          "description": "Wundcreme wurde benutzt."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freitext."
+        },
+        "time": {
+          "name": "Zeit",
+          "description": "Wann es war. Ohne Angabe jetzt."
+        },
+        "caretaker": {
+          "name": "Betreuungsperson",
+          "description": "Name einer Betreuungsperson, wie in Sprout Track eingerichtet."
+        }
+      }
+    },
+    "start_sleep": {
+      "name": "Schlaf starten",
+      "description": "Startet ein Nickerchen oder den Nachtschlaf. Schlägt fehl, wenn das Baby schon schläft.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Kann entfallen, solange nur ein Baby eingerichtet ist."
+        },
+        "sleep_type": {
+          "name": "Art",
+          "description": "Nickerchen oder Nachtschlaf."
+        },
+        "location": {
+          "name": "Ort",
+          "description": "Wo das Baby schläft, zum Beispiel Crib oder Car Seat."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freitext."
+        },
+        "time": {
+          "name": "Zeit",
+          "description": "Wann das Baby eingeschlafen ist. Ohne Angabe jetzt."
+        },
+        "caretaker": {
+          "name": "Betreuungsperson",
+          "description": "Name einer Betreuungsperson, wie in Sprout Track eingerichtet."
+        }
+      }
+    },
+    "end_sleep": {
+      "name": "Schlaf beenden",
+      "description": "Beendet den laufenden Schlaf. Schlägt fehl, wenn das Baby wach ist.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Kann entfallen, solange nur ein Baby eingerichtet ist."
+        },
+        "sleep_type": {
+          "name": "Art ändern in",
+          "description": "Für ein Nickerchen, aus dem der Nachtschlaf wurde, oder umgekehrt."
+        },
+        "quality": {
+          "name": "Qualität",
+          "description": "Wie gut das Baby geschlafen hat."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freitext."
+        },
+        "time": {
+          "name": "Zeit",
+          "description": "Wann das Baby aufgewacht ist. Ohne Angabe jetzt."
+        },
+        "caretaker": {
+          "name": "Betreuungsperson",
+          "description": "Name einer Betreuungsperson, wie in Sprout Track eingerichtet."
+        }
+      }
+    },
+    "log_sleep": {
+      "name": "Schlaf eintragen",
+      "description": "Trägt einen abgeschlossenen Schlaf bekannter Länge ein.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Kann entfallen, solange nur ein Baby eingerichtet ist."
+        },
+        "sleep_type": {
+          "name": "Art",
+          "description": "Nickerchen oder Nachtschlaf."
+        },
+        "duration": {
+          "name": "Dauer",
+          "description": "Länge in Minuten."
+        },
+        "location": {
+          "name": "Ort",
+          "description": "Wo das Baby geschlafen hat."
+        },
+        "quality": {
+          "name": "Qualität",
+          "description": "Wie gut das Baby geschlafen hat."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freitext."
+        },
+        "time": {
+          "name": "Beginn",
+          "description": "Wann das Baby eingeschlafen ist. Ohne Angabe jetzt."
+        },
+        "caretaker": {
+          "name": "Betreuungsperson",
+          "description": "Name einer Betreuungsperson, wie in Sprout Track eingerichtet."
+        }
+      }
+    },
+    "log_medicine": {
+      "name": "Medikament eintragen",
+      "description": "Trägt eine Dosis eines in Sprout Track eingerichteten Medikaments ein.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Kann entfallen, solange nur ein Baby eingerichtet ist."
+        },
+        "medicine": {
+          "name": "Medikament",
+          "description": "Name wie in Sprout Track eingerichtet."
+        },
+        "amount": {
+          "name": "Menge",
+          "description": "Die Dosis. Ohne Angabe die übliche Dosis des Medikaments."
+        },
+        "unit": {
+          "name": "Einheit",
+          "description": "Kürzel der Einheit, etwa ML. Ohne Angabe die Einheit des Medikaments."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freitext."
+        },
+        "time": {
+          "name": "Zeit",
+          "description": "Wann es gegeben wurde. Ohne Angabe jetzt."
+        },
+        "caretaker": {
+          "name": "Betreuungsperson",
+          "description": "Name einer Betreuungsperson, wie in Sprout Track eingerichtet."
+        }
+      }
+    },
+    "log_supplement": {
+      "name": "Nahrungsergänzungsmittel eintragen",
+      "description": "Trägt eine Dosis eines in Sprout Track eingerichteten Nahrungsergänzungsmittels ein.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Kann entfallen, solange nur ein Baby eingerichtet ist."
+        },
+        "supplement": {
+          "name": "Nahrungsergänzungsmittel",
+          "description": "Name wie in Sprout Track eingerichtet."
+        },
+        "amount": {
+          "name": "Menge",
+          "description": "Die Dosis. Ohne Angabe die übliche Dosis des Mittels."
+        },
+        "unit": {
+          "name": "Einheit",
+          "description": "Kürzel der Einheit, etwa DROP. Ohne Angabe die Einheit des Mittels."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freitext."
+        },
+        "time": {
+          "name": "Zeit",
+          "description": "Wann es gegeben wurde. Ohne Angabe jetzt."
+        },
+        "caretaker": {
+          "name": "Betreuungsperson",
+          "description": "Name einer Betreuungsperson, wie in Sprout Track eingerichtet."
+        }
+      }
+    },
+    "log_activity": {
+      "name": "Aktivität eintragen",
+      "description": "Trägt jede Aktivität ein, die Sprout Tracks API annimmt (Mahlzeit, Bad, Notiz, Abpumpen, Messung, Beikost, Spielen, ...), aus einer Roh-Nutzlast.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Kann entfallen, solange nur ein Baby eingerichtet ist."
+        },
+        "data": {
+          "name": "Nutzlast",
+          "description": "Der Inhalt der Anfrage wie in Sprout Tracks Webhook-API-Dokumentation beschrieben; braucht mindestens type."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "api_error": {
+      "message": "Sprout Track hat die Anfrage abgelehnt: {message} ({code})"
+    },
+    "cannot_connect": {
+      "message": "Sprout Track ist nicht erreichbar: {message}"
+    },
+    "no_baby": {
+      "message": "Kein Sprout-Track-Baby verfügbar."
+    },
+    "multiple_babies": {
+      "message": "Es ist mehr als ein Baby eingerichtet. Im Feld Baby (device_id) eines auswählen."
+    },
+    "baby_not_found": {
+      "message": "Das gewählte Gerät ist kein Sprout-Track-Baby, oder sein Server ist nicht geladen."
+    },
+    "already_asleep": {
+      "message": "{name} schläft bereits."
+    },
+    "medicine_not_found": {
+      "message": "Sprout Track kennt kein Medikament namens {name}. Vorhanden: {available}"
+    },
+    "supplement_not_found": {
+      "message": "Sprout Track kennt kein Nahrungsergänzungsmittel namens {name}. Vorhanden: {available}"
+    },
+    "amount_required": {
+      "message": "{name} hat in Sprout Track keine übliche Dosis. Eine Menge angeben."
+    }
+  }
+}

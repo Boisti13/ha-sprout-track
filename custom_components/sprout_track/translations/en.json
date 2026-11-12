@@ -1,0 +1,241 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Sprout Track",
+        "description": "Create an API key in Sprout Track under **Settings → Admin → Integrations**. It needs the *read* scope for the sensors and *write* for the buttons and actions.",
+        "data": {
+          "url": "Address of Sprout Track",
+          "api_key": "API key",
+          "verify_ssl": "Check the server's certificate"
+        },
+        "data_description": {
+          "url": "For example http://192.168.1.50:3000 or https://sprout.example.com",
+          "api_key": "Starts with st_live_ and is shown only once when it is created",
+          "verify_ssl": "Turn off only for a self-signed HTTPS certificate"
+        }
+      },
+      "reauth_confirm": {
+        "title": "New API key for Sprout Track",
+        "description": "Sprout Track at {url} no longer accepts the API key (revoked, expired or without the read scope). Create a new one under **Settings → Admin → Integrations**.",
+        "data": {
+          "api_key": "API key"
+        }
+      },
+      "reconfigure": {
+        "title": "Change the Sprout Track connection",
+        "data": {
+          "url": "Address of Sprout Track",
+          "api_key": "API key",
+          "verify_ssl": "Check the server's certificate"
+        },
+        "data_description": {
+          "url": "For example http://192.168.1.50:3000 or https://sprout.example.com",
+          "api_key": "Starts with st_live_ and is shown only once when it is created",
+          "verify_ssl": "Turn off only for a self-signed HTTPS certificate"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "No Sprout Track answered at this address. Check address and port.",
+      "invalid_auth": "Sprout Track does not accept this API key.",
+      "invalid_url": "Enter the full address, starting with http:// or https://",
+      "https_required": "Sprout Track only allows plain http:// for private IP addresses and localhost. Use the IP address or an https:// address.",
+      "read_scope_required": "This API key lacks the read scope.",
+      "unknown": "Unexpected error. The Home Assistant log has the details."
+    },
+    "abort": {
+      "already_configured": "This Sprout Track family is already set up.",
+      "reauth_successful": "The new API key works.",
+      "reconfigure_successful": "The connection was changed.",
+      "wrong_family": "This API key belongs to a different family than the one set up here."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Update every"
+        },
+        "data_description": {
+          "scan_interval": "Each update takes one request plus one per baby; Sprout Track allows 60 per minute per key."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "last_feed": { "name": "Last feed" },
+      "last_diaper": { "name": "Last diaper" },
+      "sleep_state": {
+        "name": "Sleep state",
+        "state": {
+          "awake": "Awake",
+          "nap": "Nap",
+          "night_sleep": "Night sleep",
+          "asleep": "Asleep"
+        }
+      },
+      "asleep_since": { "name": "Asleep since" },
+      "awake_since": { "name": "Awake since" },
+      "last_sleep_duration": { "name": "Last sleep duration" },
+      "last_bath": { "name": "Last bath" },
+      "last_medicine": { "name": "Last medicine" },
+      "last_supplement": { "name": "Last supplement" },
+      "last_pump": { "name": "Last pump" },
+      "feeds_today": { "name": "Feeds today" },
+      "diapers_today": { "name": "Diapers today" },
+      "wet_diapers_today": { "name": "Wet diapers today" },
+      "dirty_diapers_today": { "name": "Dirty diapers today" },
+      "sleep_today": { "name": "Sleep today" },
+      "naps_today": { "name": "Naps today" },
+      "baths_today": { "name": "Baths today" },
+      "medicines_today": { "name": "Medicines today" },
+      "supplements_today": { "name": "Supplements today" },
+      "age": { "name": "Age" },
+      "weight": { "name": "Weight" },
+      "height": { "name": "Height" },
+      "head_circumference": { "name": "Head circumference" },
+      "temperature": { "name": "Temperature" }
+    },
+    "binary_sensor": {
+      "sleeping": { "name": "Sleeping" },
+      "feed_overdue": { "name": "Feed overdue" },
+      "diaper_overdue": { "name": "Diaper overdue" },
+      "breastfeeding": { "name": "Breastfeeding" },
+      "pumping": { "name": "Pumping" }
+    },
+    "button": {
+      "log_wet_diaper": { "name": "Log wet diaper" },
+      "log_dirty_diaper": { "name": "Log dirty diaper" },
+      "log_wet_and_dirty_diaper": { "name": "Log wet and dirty diaper" },
+      "start_nap": { "name": "Start nap" },
+      "start_night_sleep": { "name": "Start night sleep" },
+      "end_sleep": { "name": "End sleep" }
+    }
+  },
+  "selector": {
+    "diaper_type": {
+      "options": { "wet": "Wet", "dirty": "Dirty", "both": "Wet and dirty", "dry": "Dry" }
+    },
+    "diaper_condition": {
+      "options": { "normal": "Normal", "loose": "Loose", "firm": "Firm", "other": "Other" }
+    },
+    "diaper_color": {
+      "options": {
+        "yellow": "Yellow",
+        "brown": "Brown",
+        "green": "Green",
+        "black": "Black",
+        "red": "Red",
+        "other": "Other"
+      }
+    },
+    "sleep_type": {
+      "options": { "nap": "Nap", "night_sleep": "Night sleep" }
+    },
+    "sleep_quality": {
+      "options": { "poor": "Poor", "fair": "Fair", "good": "Good", "excellent": "Excellent" }
+    }
+  },
+  "services": {
+    "log_diaper": {
+      "name": "Log diaper",
+      "description": "Logs a diaper change.",
+      "fields": {
+        "device_id": { "name": "Baby", "description": "Can be left out while only one baby is set up." },
+        "diaper_type": { "name": "Type", "description": "What was in the diaper." },
+        "condition": { "name": "Condition", "description": "Consistency of the stool." },
+        "color": { "name": "Color", "description": "Color of the stool." },
+        "blowout": { "name": "Blowout", "description": "The diaper leaked." },
+        "cream_applied": { "name": "Cream applied", "description": "Diaper cream was used." },
+        "notes": { "name": "Notes", "description": "Free text." },
+        "time": { "name": "Time", "description": "When it happened. Now if left out." },
+        "caretaker": { "name": "Caretaker", "description": "Name of a caretaker as set up in Sprout Track." }
+      }
+    },
+    "start_sleep": {
+      "name": "Start sleep",
+      "description": "Starts a nap or night sleep. Fails if the baby is already asleep.",
+      "fields": {
+        "device_id": { "name": "Baby", "description": "Can be left out while only one baby is set up." },
+        "sleep_type": { "name": "Type", "description": "Nap or night sleep." },
+        "location": { "name": "Location", "description": "Where the baby sleeps, for example Crib or Car Seat." },
+        "notes": { "name": "Notes", "description": "Free text." },
+        "time": { "name": "Time", "description": "When the baby fell asleep. Now if left out." },
+        "caretaker": { "name": "Caretaker", "description": "Name of a caretaker as set up in Sprout Track." }
+      }
+    },
+    "end_sleep": {
+      "name": "End sleep",
+      "description": "Ends the running sleep. Fails if the baby is awake.",
+      "fields": {
+        "device_id": { "name": "Baby", "description": "Can be left out while only one baby is set up." },
+        "sleep_type": { "name": "Change type to", "description": "For a nap that turned into the night's sleep, or the other way round." },
+        "quality": { "name": "Quality", "description": "How well the baby slept." },
+        "notes": { "name": "Notes", "description": "Free text." },
+        "time": { "name": "Time", "description": "When the baby woke up. Now if left out." },
+        "caretaker": { "name": "Caretaker", "description": "Name of a caretaker as set up in Sprout Track." }
+      }
+    },
+    "log_sleep": {
+      "name": "Log sleep",
+      "description": "Logs a finished sleep of a known length.",
+      "fields": {
+        "device_id": { "name": "Baby", "description": "Can be left out while only one baby is set up." },
+        "sleep_type": { "name": "Type", "description": "Nap or night sleep." },
+        "duration": { "name": "Duration", "description": "Length in minutes." },
+        "location": { "name": "Location", "description": "Where the baby slept." },
+        "quality": { "name": "Quality", "description": "How well the baby slept." },
+        "notes": { "name": "Notes", "description": "Free text." },
+        "time": { "name": "Start time", "description": "When the baby fell asleep. Now if left out." },
+        "caretaker": { "name": "Caretaker", "description": "Name of a caretaker as set up in Sprout Track." }
+      }
+    },
+    "log_medicine": {
+      "name": "Log medicine",
+      "description": "Logs a dose of a medicine that is set up in Sprout Track.",
+      "fields": {
+        "device_id": { "name": "Baby", "description": "Can be left out while only one baby is set up." },
+        "medicine": { "name": "Medicine", "description": "Name as set up in Sprout Track." },
+        "amount": { "name": "Amount", "description": "The dose. The medicine's typical dose if left out." },
+        "unit": { "name": "Unit", "description": "Unit abbreviation such as ML. The medicine's own unit if left out." },
+        "notes": { "name": "Notes", "description": "Free text." },
+        "time": { "name": "Time", "description": "When it was given. Now if left out." },
+        "caretaker": { "name": "Caretaker", "description": "Name of a caretaker as set up in Sprout Track." }
+      }
+    },
+    "log_supplement": {
+      "name": "Log supplement",
+      "description": "Logs a dose of a supplement that is set up in Sprout Track.",
+      "fields": {
+        "device_id": { "name": "Baby", "description": "Can be left out while only one baby is set up." },
+        "supplement": { "name": "Supplement", "description": "Name as set up in Sprout Track." },
+        "amount": { "name": "Amount", "description": "The dose. The supplement's typical dose if left out." },
+        "unit": { "name": "Unit", "description": "Unit abbreviation such as DROP. The supplement's own unit if left out." },
+        "notes": { "name": "Notes", "description": "Free text." },
+        "time": { "name": "Time", "description": "When it was given. Now if left out." },
+        "caretaker": { "name": "Caretaker", "description": "Name of a caretaker as set up in Sprout Track." }
+      }
+    },
+    "log_activity": {
+      "name": "Log activity",
+      "description": "Logs any activity the Sprout Track API accepts (feed, bath, note, pump, measurement, food, play, ...) from a raw payload.",
+      "fields": {
+        "device_id": { "name": "Baby", "description": "Can be left out while only one baby is set up." },
+        "data": { "name": "Payload", "description": "The request body as described in Sprout Track's webhook API documentation; needs at least a type." }
+      }
+    }
+  },
+  "exceptions": {
+    "api_error": { "message": "Sprout Track refused the request: {message} ({code})" },
+    "cannot_connect": { "message": "Sprout Track cannot be reached: {message}" },
+    "no_baby": { "message": "No Sprout Track baby is available." },
+    "multiple_babies": { "message": "More than one baby is set up. Pick one in the Baby field (device_id)." },
+    "baby_not_found": { "message": "The chosen device is not a Sprout Track baby, or its server is not loaded." },
+    "already_asleep": { "message": "{name} is already asleep." },
+    "medicine_not_found": { "message": "Sprout Track has no medicine called {name}. Available: {available}" },
+    "supplement_not_found": { "message": "Sprout Track has no supplement called {name}. Available: {available}" },
+    "amount_required": { "message": "{name} has no typical dose in Sprout Track. Give an amount." }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "success": true,
+  "data": {
+    "measurements": {
+      "WEIGHT": {
+        "value": 4.2,
+        "unit": "KG",
+        "date": "2026-11-12",
+        "daysAgo": 0
+      },
+      "HEIGHT": {
+        "value": 54,
+        "unit": "CM",
+        "date": "2026-11-12",
+        "daysAgo": 0
+      },
+      "HEAD_CIRCUMFERENCE": null,
+      "TEMPERATURE": null
+    }
+  },
+  "meta": {
+    "timestamp": "2026-11-12T18:45:15.607Z",
+    "familyId": "family-1",
+    "babyId": "baby-1"
+  }
+}

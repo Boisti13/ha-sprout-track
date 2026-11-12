@@ -1,0 +1,42 @@
+{
+  "success": true,
+  "data": {
+    "baby": {
+      "id": "baby-2",
+      "firstName": "Mia",
+      "ageInDays": 150
+    },
+    "lastActivities": {
+      "feed": null,
+      "diaper": null,
+      "sleep": null,
+      "bath": null,
+      "medicine": null,
+      "supplement": null,
+      "pump": null
+    },
+    "activeFeed": null,
+    "dailyCounts": {
+      "date": "2026-11-12",
+      "feeds": 0,
+      "diapers": 0,
+      "diapersByType": {},
+      "sleepMinutes": 0,
+      "naps": 0,
+      "baths": 0,
+      "medicines": 0,
+      "supplements": 0
+    },
+    "warnings": {
+      "feedOverdue": false,
+      "feedMinutesSinceWarning": null,
+      "diaperOverdue": false,
+      "diaperMinutesSinceWarning": null
+    }
+  },
+  "meta": {
+    "timestamp": "2026-11-12T18:45:15.588Z",
+    "familyId": "family-1",
+    "babyId": "baby-2"
+  }
+}
