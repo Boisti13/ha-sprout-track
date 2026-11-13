@@ -412,6 +412,25 @@ async def test_medicine_added_and_removed(
     assert _state(hass, "sensor.emma_paracetamol_next_dose") == "2026-11-13T13:38:21+00:00"
 
 
+async def test_medicine_removed_while_reloading(
+    hass: HomeAssistant, loaded: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """A medicine that went away during a reload loses its sensor too."""
+    registry = er.async_get(hass)
+    assert registry.async_get("sensor.emma_paracetamol_last_given") is not None
+    assert await hass.config_entries.async_unload(loaded.entry_id)
+
+    reference = load("reference")
+    reference["data"]["medicines"] = []
+    mock_api(aioclient_mock, reference=reference)
+    assert await hass.config_entries.async_setup(loaded.entry_id)
+    await hass.async_block_till_done()
+    assert registry.async_get("sensor.emma_paracetamol_last_given") is None
+    assert registry.async_get("sensor.mia_paracetamol_last_given") is None
+    assert _state(hass, "sensor.emma_vitamin_d_last_given") == "2026-11-12T13:38:21+00:00"
+    assert _state(hass, "sensor.emma_last_feed") == "2026-11-12T13:38:21+00:00"
+
+
 def test_parse_dose_gap() -> None:
     """Minimum gaps come as "DD:HH:MM"; anything else means none."""
     assert parse_dose_gap("00:04:00") == timedelta(hours=4)
