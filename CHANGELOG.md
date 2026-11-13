@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.2.0 — 2026-11-13
+
 ### Added
 
 - **Sensors per medicine and supplement**: *Name last given* (time of the
