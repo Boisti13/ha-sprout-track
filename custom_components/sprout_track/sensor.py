@@ -36,6 +36,13 @@ PARALLEL_UPDATES = 0
 
 SLEEP_STATES = ["awake", "nap", "night_sleep", "asleep"]
 
+DOSE_SUFFIXES = ("_last_given", "_next_dose")
+
+
+def _dose_unique_id(baby_id: str, kind: str, item_id: str, which: str) -> str:
+    return f"{baby_id}_{kind}_{item_id}_{which}"
+
+
 # Sensors made per medicine and supplement (not in SENSORS: they come and go
 # with the medicines set up in Sprout Track).
 DOSE_TRANSLATION_KEYS = tuple(
@@ -417,10 +424,20 @@ def _add_dose_sensors(
         registry = er.async_get(hass)
         for key in known.keys() - wanted.keys():
             entity = known.pop(key)
-            if entity.entity_id and registry.async_get(entity.entity_id):
-                registry.async_remove(entity.entity_id)
-            elif entity.hass is not None:
+            if entity.hass is not None and not (
+                entity.entity_id and registry.async_get(entity.entity_id)
+            ):
                 hass.async_create_task(entity.async_remove())
+        # Also sensors of medicines that went away while the integration was
+        # not running (or reloading): those are only in the registry.
+        wanted_ids = {_dose_unique_id(*key) for key in wanted}
+        for reg_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
+            if (
+                reg_entry.domain == "sensor"
+                and reg_entry.unique_id.endswith(DOSE_SUFFIXES)
+                and reg_entry.unique_id not in wanted_ids
+            ):
+                registry.async_remove(reg_entry.entity_id)
 
         new = [
             SproutTrackDoseSensor(coordinator, *key, name=str(wanted[key].get("name") or ""))

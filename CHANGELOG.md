@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Sensors of deleted medicines stayed behind** when the medicine went
+  away while the integration was reloading or Home Assistant was off:
+  they are now removed from the entity registry at the next update.
+
 ## v0.2.0 — 2026-11-13
 
 ### Added
