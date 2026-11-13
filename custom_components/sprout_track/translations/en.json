@@ -84,6 +84,7 @@
       "last_supplement": { "name": "Last supplement" },
       "last_pump": { "name": "Last pump" },
       "feeds_today": { "name": "Feeds today" },
+      "fed_today": { "name": "Fed today" },
       "diapers_today": { "name": "Diapers today" },
       "wet_diapers_today": { "name": "Wet diapers today" },
       "dirty_diapers_today": { "name": "Dirty diapers today" },

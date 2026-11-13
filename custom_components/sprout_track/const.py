@@ -25,5 +25,7 @@ MEASUREMENT_INTERVAL = timedelta(minutes=15)
 DOSE_KINDS = ("medicine", "supplement")
 DOSE_HISTORY = timedelta(days=30)
 DOSE_LIMIT = 50  # the API's maximum
+FEED_HISTORY = timedelta(hours=24)  # covers today and the last 24 hours
+FEED_LIMIT = 50
 
 MANUFACTURER = "Sprout Track"

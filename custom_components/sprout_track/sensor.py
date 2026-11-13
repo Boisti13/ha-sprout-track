@@ -13,7 +13,13 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import UnitOfLength, UnitOfMass, UnitOfTemperature, UnitOfTime
+from homeassistant.const import (
+    UnitOfLength,
+    UnitOfMass,
+    UnitOfTemperature,
+    UnitOfTime,
+    UnitOfVolume,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import Entity
@@ -145,6 +151,14 @@ def _dose_lists(kind: str) -> Callable[[BabyData], dict[str, Any]]:
     return attrs
 
 
+def _fed_today(baby: BabyData) -> StateType:
+    return baby.fed_since(dt_util.start_of_local_day())
+
+
+def _fed_attrs(baby: BabyData) -> dict[str, Any]:
+    return {"last_24_hours": baby.fed_since(dt_util.utcnow() - timedelta(hours=24))}
+
+
 def _sleep_state(baby: BabyData) -> str | None:
     if not baby.status:
         return None
@@ -255,6 +269,15 @@ SENSORS: tuple[SproutTrackSensorDescription, ...] = (
         translation_key="feeds_today",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=_count("feeds"),
+    ),
+    SproutTrackSensorDescription(
+        key="fed_today",
+        translation_key="fed_today",
+        native_unit_of_measurement=UnitOfVolume.MILLILITERS,
+        suggested_display_precision=0,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=_fed_today,
+        attrs_fn=_fed_attrs,
     ),
     SproutTrackSensorDescription(
         key="diapers_today",

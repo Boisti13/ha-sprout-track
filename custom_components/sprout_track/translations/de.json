@@ -104,6 +104,9 @@
       "feeds_today": {
         "name": "Mahlzeiten heute"
       },
+      "fed_today": {
+        "name": "Getrunken heute"
+      },
       "diapers_today": {
         "name": "Windeln heute"
       },

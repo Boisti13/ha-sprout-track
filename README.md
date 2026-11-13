@@ -23,8 +23,8 @@ project and not part of Sprout Track.
   entered later without removing anything.
 - **One device per baby**, with every baby of the family. Babies added in
   Sprout Track appear on their own.
-- **24 sensors per baby**: last feed, diaper, sleep, bath, medicine and
-  supplement; today's counts; age; latest weight, height, head
+- **25 sensors per baby**: last feed, diaper, sleep, bath, medicine and
+  supplement; today's counts and millilitres fed; age; latest weight, height, head
   circumference and temperature.
 - **Per medicine and supplement**: when it was last given and, where
   Sprout Track has a minimum time between doses, when the next dose is
@@ -84,6 +84,7 @@ Entity IDs start with the baby's first name, e.g. `sensor.emma_last_feed`.
 | Last supplement | time | `supplement` |
 | Last pump | time | `duration` |
 | Feeds today | count | |
+| Fed today | millilitres from bottle feeds since midnight (ounces converted; breastfeeds and solids left out) | `last_24_hours` |
 | Diapers today | count | |
 | Wet diapers today | count (wet, and wet-and-dirty) | |
 | Dirty diapers today | count (dirty, and wet-and-dirty) | |

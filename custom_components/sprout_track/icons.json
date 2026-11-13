@@ -15,6 +15,7 @@
       "last_supplement": { "default": "mdi:eyedropper" },
       "last_pump": { "default": "mdi:mother-nurse" },
       "feeds_today": { "default": "mdi:baby-bottle-outline" },
+      "fed_today": { "default": "mdi:cup-water" },
       "diapers_today": { "default": "mdi:human-baby-changing-table" },
       "wet_diapers_today": { "default": "mdi:water-outline" },
       "dirty_diapers_today": { "default": "mdi:emoticon-poop" },
