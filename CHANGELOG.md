@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.2.1 — 2026-11-13
+
 ### Fixed
 
 - **Sensors of deleted medicines stayed behind** when the medicine went
