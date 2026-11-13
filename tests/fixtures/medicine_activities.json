@@ -1,0 +1,38 @@
+{
+  "success": true,
+  "data": {
+    "activities": [
+      {
+        "activityType": "medicine",
+        "id": "medicine-log-1",
+        "time": "2026-11-12T13:38:21.893Z",
+        "details": {
+          "medicineName": "Paracetamol",
+          "doseAmount": 2.5,
+          "unitAbbr": "ML",
+          "notes": null
+        },
+        "caretakerName": null
+      },
+      {
+        "activityType": "medicine",
+        "id": "medicine-log-2",
+        "time": "2026-11-12T07:00:00.000Z",
+        "details": {
+          "medicineName": "Paracetamol",
+          "doseAmount": 2.5,
+          "unitAbbr": "ML",
+          "notes": null
+        },
+        "caretakerName": null
+      }
+    ],
+    "count": 2,
+    "hasMore": false
+  },
+  "meta": {
+    "timestamp": "2026-11-12T18:00:00.000Z",
+    "familyId": "family-1",
+    "babyId": "baby-1"
+  }
+}

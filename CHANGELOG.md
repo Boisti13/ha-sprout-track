@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## v0.2.0 — 2026-11-13
+
+### Added
+
+- **Sensors per medicine and supplement**: *Name last given* (time of the
+  last dose, with amount, unit and doses today) for every medicine and
+  supplement set up in Sprout Track, and *Name next dose* (when the next
+  dose is allowed) for those with a minimum time between doses. They
+  appear and go away with the medicines in Sprout Track. *Next dose* needs
+  a Sprout Track whose hooks API sends `doseMinTime`
+  (Oak-and-Sprout/sprout-track#298).
+- **Dose lists** on *Medicines today* and *Supplements today*: `doses`
+  (every dose since midnight) and `latest` (each medicine given in the
+  last 24 hours, with `next_dose`), for dashboards and templates.
+
+### Under the hood
+
+- Doses are fetched only when the status shows a new one, plus every
+  15 minutes with the measurements and the medicine list; a normal update
+  still costs one read plus one per baby.
+
 ## v0.1.1 — 2026-11-13
 
 ### Added

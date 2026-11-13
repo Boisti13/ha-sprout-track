@@ -20,10 +20,13 @@ owner's setup.
   (`baby-1`, `family-1`, Emma/Mia Sample). README screenshots, if any,
   come from the test instance.
 - **Layout:** `api.py` is the HTTP client (no Home Assistant imports);
-  `coordinator.py` polls `/babies`, each baby's `/status` every interval
-  and `/measurements/latest` every 15 min, into one `BabyData` per baby;
+  `coordinator.py` polls `/babies`, each baby's `/status` every interval,
+  `/measurements/latest` and `/reference` every 15 min, and the medicine
+  and supplement doses (`/activities?type=…`, 30 days) when the status
+  shows a new one or with the 15-min fetch, into one `BabyData` per baby;
   `entity.py` has the base entity and `add_entities_per_baby()` (babies
-  come and go without a reload); `sensor.py`, `binary_sensor.py`,
+  come and go without a reload); the per-medicine sensors are added and
+  removed by their own listener in `sensor.py` (`_add_dose_sensors`); `sensor.py`, `binary_sensor.py`,
   `button.py` are description tables; `services.py` holds the actions and
   the two helpers the buttons share (`async_log_activity`,
   `async_start_sleep`).

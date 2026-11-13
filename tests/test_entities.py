@@ -17,6 +17,7 @@ from pytest_homeassistant_custom_component.common import (
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.sprout_track.const import DOMAIN
+from custom_components.sprout_track.coordinator import parse_dose_gap
 
 from .conftest import API, BABY_1, BABY_2, api_error, load, mock_api
 
@@ -46,7 +47,9 @@ async def test_devices(hass: HomeAssistant, loaded: MockConfigEntry) -> None:
     assert emma.manufacturer == "Sprout Track"
     assert emma.configuration_url == "http://192.168.1.50:3000"
     entities = er.async_entries_for_device(er.async_get(hass), emma.id)
-    assert len(entities) == 24 + 5 + 6
+    # 24 sensors, 5 binary sensors, 6 buttons, *last given* for Paracetamol
+    # and Vitamin D (no *next dose*: no minimum gap in the fixture)
+    assert len(entities) == 24 + 5 + 6 + 2
     assert all(e.unique_id.startswith(f"{BABY_1}_") for e in entities)
 
 
@@ -288,3 +291,130 @@ async def test_diagnostics(hass: HomeAssistant, loaded: MockConfigEntry) -> None
     ):
         assert secret not in text
     assert result["babies"][0]["status"]["dailyCounts"]["feeds"] == 1
+
+
+def _reference_with_gap(gap: str = "00:04:00") -> dict:
+    reference = load("reference")
+    reference["data"]["medicines"][0]["doseMinTime"] = gap
+    reference["data"]["supplements"][0]["doseMinTime"] = ""
+    return reference
+
+
+async def test_dose_sensors(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Each medicine gets *last given*, one with a minimum gap *next dose* too."""
+    await hass.config.async_set_time_zone("Europe/Berlin")
+    freezer.move_to("2026-11-12T18:00:00+00:00")
+    mock_api(aioclient_mock, reference=_reference_with_gap())
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    last = hass.states.get("sensor.emma_paracetamol_last_given")
+    assert last.state == "2026-11-12T13:38:21+00:00"
+    assert last.attributes["amount"] == 2.5
+    assert last.attributes["unit"] == "ML"
+    assert last.attributes["doses_today"] == 2  # 08:00 and 14:38 Berlin time
+    assert last.attributes["minimum_gap_minutes"] == 240
+    assert _state(hass, "sensor.emma_paracetamol_next_dose") == "2026-11-12T17:38:21+00:00"
+
+    assert _state(hass, "sensor.emma_vitamin_d_last_given") == "2026-11-12T13:38:21+00:00"
+    assert hass.states.get("sensor.emma_vitamin_d_next_dose") is None
+    assert _state(hass, "sensor.mia_paracetamol_last_given") == STATE_UNKNOWN
+    assert _state(hass, "sensor.mia_paracetamol_next_dose") == STATE_UNKNOWN
+
+    medicines = hass.states.get("sensor.emma_medicines_today").attributes
+    assert [d["time"] for d in medicines["doses"]] == [
+        "2026-11-12T14:38:21.893000+01:00",
+        "2026-11-12T08:00:00+01:00",
+    ]
+    assert medicines["latest"] == [
+        {
+            "time": "2026-11-12T14:38:21.893000+01:00",
+            "name": "Paracetamol",
+            "amount": 2.5,
+            "unit": "ML",
+            "next_dose": "2026-11-12T18:38:21.893000+01:00",
+        }
+    ]
+    supplements = hass.states.get("sensor.emma_supplements_today").attributes
+    assert supplements["latest"][0]["name"] == "Vitamin D"
+    assert supplements["latest"][0]["next_dose"] is None
+    assert hass.states.get("sensor.mia_medicines_today").attributes == {
+        **hass.states.get("sensor.mia_medicines_today").attributes,
+        "doses": [],
+        "latest": [],
+    }
+
+    # A day later: nothing today, nothing in the last 24 hours
+    freezer.move_to("2026-11-13T18:00:00+00:00")
+    await _poll(hass)
+    medicines = hass.states.get("sensor.emma_medicines_today").attributes
+    assert medicines["doses"] == []
+    assert medicines["latest"] == []
+    assert hass.states.get("sensor.emma_paracetamol_last_given").attributes["doses_today"] == 0
+
+
+async def test_doses_fetched_on_change(
+    hass: HomeAssistant,
+    loaded: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Doses are fetched when the status shows a new one, and every 15 minutes."""
+
+    def count() -> int:
+        return sum(
+            call[0] == "GET" and "/activities" in str(call[1]) for call in aioclient_mock.mock_calls
+        )
+
+    assert count() == 4  # two babies, medicines and supplements
+    await _poll(hass)
+    assert count() == 4
+
+    status = load("status")
+    status["data"]["lastActivities"]["medicine"]["time"] = "2026-11-12T15:00:00.000Z"
+    mock_api(aioclient_mock, status_1=status)
+    await _poll(hass)
+    assert count() == 1  # only Emma's medicines (the mock was reset)
+
+    freezer.tick(timedelta(minutes=16))
+    await _poll(hass)
+    assert count() == 5
+
+
+async def test_medicine_added_and_removed(
+    hass: HomeAssistant,
+    loaded: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Sensors follow the medicines set up in Sprout Track."""
+    registry = er.async_get(hass)
+    assert registry.async_get("sensor.emma_paracetamol_last_given") is not None
+
+    reference = load("reference")
+    reference["data"]["medicines"] = []
+    mock_api(aioclient_mock, reference=reference)
+    freezer.tick(timedelta(minutes=16))
+    await _poll(hass)
+    assert registry.async_get("sensor.emma_paracetamol_last_given") is None
+    assert hass.states.get("sensor.emma_paracetamol_last_given") is None
+    assert _state(hass, "sensor.emma_vitamin_d_last_given") != STATE_UNAVAILABLE
+
+    mock_api(aioclient_mock, reference=_reference_with_gap("01:00:00"))
+    freezer.tick(timedelta(minutes=16))
+    await _poll(hass)
+    assert _state(hass, "sensor.emma_paracetamol_last_given") == "2026-11-12T13:38:21+00:00"
+    assert _state(hass, "sensor.emma_paracetamol_next_dose") == "2026-11-13T13:38:21+00:00"
+
+
+def test_parse_dose_gap() -> None:
+    """Minimum gaps come as "DD:HH:MM"; anything else means none."""
+    assert parse_dose_gap("00:04:00") == timedelta(hours=4)
+    assert parse_dose_gap("01:02:03") == timedelta(days=1, hours=2, minutes=3)
+    for value in ("", "00:00:00", "4h", "00:04", None, 240, "aa:bb:cc"):
+        assert parse_dose_gap(value) is None, value

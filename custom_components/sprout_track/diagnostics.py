@@ -21,6 +21,7 @@ TO_REDACT = {
     "ageInDays",
     "ageFormatted",
     "caretakerName",
+    "name",
     "medicineName",
     "supplementName",
     "notes",

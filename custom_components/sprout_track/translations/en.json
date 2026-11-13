@@ -96,7 +96,11 @@
       "weight": { "name": "Weight" },
       "height": { "name": "Height" },
       "head_circumference": { "name": "Head circumference" },
-      "temperature": { "name": "Temperature" }
+      "temperature": { "name": "Temperature" },
+      "medicine_last_given": { "name": "{name} last given" },
+      "medicine_next_dose": { "name": "{name} next dose" },
+      "supplement_last_given": { "name": "{name} last given" },
+      "supplement_next_dose": { "name": "{name} next dose" }
     },
     "binary_sensor": {
       "sleeping": { "name": "Sleeping" },
