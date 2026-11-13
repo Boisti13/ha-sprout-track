@@ -32,6 +32,12 @@ owner's setup.
   for actions the fields in `services.yaml`, a test, a README table row
   and a CHANGELOG line. `test_translations_cover_everything` fails when
   texts, icons or fields are missing.
+- **Icon:** `custom_components/sprout_track/brand/icon.png` (256 px) and
+  `icon@2x.png` (512 px), rendered from `assets/icon.svg` with ImageMagick
+  (`convert -background none -density 192 assets/icon.svg -resize 256x256
+  PNG32:…/icon.png`, density 384 and 512x512 for `@2x`). An original
+  drawing: never Sprout Track's own logo. ImageMagick's SVG renderer drops
+  stroked curves without fill; draw shapes as filled paths.
 - **Timestamps, not "minutes ago".** The API's `minutesAgo` changes every
   minute; sensors expose the time instead and Home Assistant shows
   "5 minutes ago" itself. Don't add counters that tick.

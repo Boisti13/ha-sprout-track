@@ -324,3 +324,17 @@ def test_translations_cover_everything() -> None:
         ):
             assert set(strings["entity"][platform]) == {d.translation_key for d in descriptions}
         assert set(strings["entity"]["sensor"]["sleep_state"]["state"]) == set(sensor.SLEEP_STATES)
+
+
+def test_brand_icons() -> None:
+    """The icon ships in both sizes Home Assistant asks for."""
+    from pathlib import Path  # noqa: PLC0415
+    import struct  # noqa: PLC0415
+
+    from custom_components import sprout_track  # noqa: PLC0415
+
+    brand = Path(sprout_track.__file__).parent / "brand"
+    for name, size in (("icon.png", 256), ("icon@2x.png", 512)):
+        data = (brand / name).read_bytes()
+        assert data[:8] == b"\x89PNG\r\n\x1a\n"
+        assert struct.unpack(">II", data[16:24]) == (size, size)

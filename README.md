@@ -224,6 +224,7 @@ custom_components/sprout_track/
   sensor.py  binary_sensor.py  button.py
   services.py       actions (and what the buttons send)
   services.yaml  icons.json  translations/
+  brand/            the integration's icon (source: assets/icon.svg)
 tests/              pytest, with recorded API answers in fixtures/
 ```
 

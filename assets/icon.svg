@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- soft round background -->
+  <circle cx="128" cy="128" r="120" fill="#e8f5e9"/>
+  <!-- stem -->
+  <path d="M122 198 C122 164 120 142 122 112 Q128 104 134 112 C132 142 134 164 134 198 Z" fill="#2e7d32"/>
+  <!-- soil -->
+  <path d="M58 196 Q128 168 198 196 Q198 214 128 214 Q58 214 58 196 Z" fill="#8d6e63"/>
+  <!-- left leaf -->
+  <path d="M126 128 C96 130 68 112 62 76 C98 70 124 92 126 128 Z" fill="#43a047"/>
+  <!-- right leaf -->
+  <path d="M130 112 C132 76 158 52 196 52 C198 90 170 114 130 112 Z" fill="#66bb6a"/>
+  <!-- leaf veins -->
+  <path d="M122 124 C104 112 88 98 72 82" fill="none" stroke="#2e7d32" stroke-width="4" stroke-linecap="round" opacity=".55"/>
+  <path d="M134 108 C152 92 170 76 188 60" fill="none" stroke="#2e7d32" stroke-width="4" stroke-linecap="round" opacity=".55"/>
+</svg>

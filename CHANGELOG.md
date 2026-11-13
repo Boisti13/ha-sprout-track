@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- **Icon**: the integration brings its own icon (a sprout), shown in the
+  integration list, on the device page and in the Marketplace / HACS.
+  Needs Home Assistant 2026.3 or newer; older versions show no icon.
+
 ## v0.1.0 — 2026-11-12
 
 First release.
