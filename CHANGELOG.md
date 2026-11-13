@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Under the hood
+
+- The GitHub checks run on every push again (Actions had to be switched
+  off and on for the repository), and a newer push cancels the older run.
+
 ## v0.2.1 — 2026-11-13
 
 ### Fixed
