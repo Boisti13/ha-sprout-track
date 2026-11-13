@@ -1,0 +1,86 @@
+{
+  "success": true,
+  "data": {
+    "activities": [
+      {
+        "activityType": "feed",
+        "id": "feed-3",
+        "time": "2026-11-12T13:38:21.867Z",
+        "details": {
+          "type": "BOTTLE",
+          "amount": 120,
+          "unitAbbr": "ML",
+          "bottleType": "Formula",
+          "side": null,
+          "food": null,
+          "notes": null,
+          "startTime": null,
+          "endTime": null,
+          "feedDuration": null
+        },
+        "caretakerName": null
+      },
+      {
+        "activityType": "feed",
+        "id": "feed-2",
+        "time": "2026-11-12T09:10:00.000Z",
+        "details": {
+          "type": "BREAST",
+          "amount": null,
+          "unitAbbr": null,
+          "bottleType": null,
+          "side": "LEFT",
+          "food": null,
+          "notes": null,
+          "startTime": "2026-11-12T09:00:00.000Z",
+          "endTime": "2026-11-12T09:10:00.000Z",
+          "feedDuration": 600
+        },
+        "caretakerName": null
+      },
+      {
+        "activityType": "feed",
+        "id": "feed-1",
+        "time": "2026-11-12T06:00:00.000Z",
+        "details": {
+          "type": "BOTTLE",
+          "amount": 3,
+          "unitAbbr": "OZ",
+          "bottleType": "Formula",
+          "side": null,
+          "food": null,
+          "notes": null,
+          "startTime": null,
+          "endTime": null,
+          "feedDuration": null
+        },
+        "caretakerName": null
+      },
+      {
+        "activityType": "feed",
+        "id": "feed-0",
+        "time": "2026-11-11T21:00:00.000Z",
+        "details": {
+          "type": "BOTTLE",
+          "amount": 100,
+          "unitAbbr": "ML",
+          "bottleType": "Formula",
+          "side": null,
+          "food": null,
+          "notes": null,
+          "startTime": null,
+          "endTime": null,
+          "feedDuration": null
+        },
+        "caretakerName": null
+      }
+    ],
+    "count": 4,
+    "hasMore": false
+  },
+  "meta": {
+    "timestamp": "2026-11-12T18:45:15.574Z",
+    "familyId": "family-1",
+    "babyId": "baby-1"
+  }
+}

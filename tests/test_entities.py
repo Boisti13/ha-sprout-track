@@ -47,9 +47,9 @@ async def test_devices(hass: HomeAssistant, loaded: MockConfigEntry) -> None:
     assert emma.manufacturer == "Sprout Track"
     assert emma.configuration_url == "http://192.168.1.50:3000"
     entities = er.async_entries_for_device(er.async_get(hass), emma.id)
-    # 24 sensors, 5 binary sensors, 6 buttons, *last given* for Paracetamol
+    # 25 sensors, 5 binary sensors, 6 buttons, *last given* for Paracetamol
     # and Vitamin D (no *next dose*: no minimum gap in the fixture)
-    assert len(entities) == 24 + 5 + 6 + 2
+    assert len(entities) == 25 + 5 + 6 + 2
     assert all(e.unique_id.startswith(f"{BABY_1}_") for e in entities)
 
 
@@ -371,9 +371,9 @@ async def test_doses_fetched_on_change(
             call[0] == "GET" and "/activities" in str(call[1]) for call in aioclient_mock.mock_calls
         )
 
-    assert count() == 4  # two babies, medicines and supplements
+    assert count() == 6  # two babies: medicines, supplements and feeds
     await _poll(hass)
-    assert count() == 4
+    assert count() == 6
 
     status = load("status")
     status["data"]["lastActivities"]["medicine"]["time"] = "2026-11-12T15:00:00.000Z"
@@ -383,7 +383,7 @@ async def test_doses_fetched_on_change(
 
     freezer.tick(timedelta(minutes=16))
     await _poll(hass)
-    assert count() == 5
+    assert count() == 7
 
 
 async def test_medicine_added_and_removed(
@@ -437,3 +437,50 @@ def test_parse_dose_gap() -> None:
     assert parse_dose_gap("01:02:03") == timedelta(days=1, hours=2, minutes=3)
     for value in ("", "00:00:00", "4h", "00:04", None, 240, "aa:bb:cc"):
         assert parse_dose_gap(value) is None, value
+
+
+async def test_fed_today(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Bottle feeds since midnight add up in millilitres; ounces are converted."""
+    await hass.config.async_set_time_zone("Europe/Berlin")
+    freezer.move_to("2026-11-12T18:00:00+00:00")
+    mock_api(aioclient_mock)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    fed = hass.states.get("sensor.emma_fed_today")
+    # 120 ml at 14:38 and 3 oz at 07:00 Berlin time; the breastfeed has no
+    # amount, and 100 ml at 22:00 the evening before is not today
+    assert fed.state == "208.7"
+    assert fed.attributes["unit_of_measurement"] == "mL"
+    assert fed.attributes["last_24_hours"] == 308.7
+    assert _state(hass, "sensor.mia_fed_today") == "0.0"
+
+    # A new day starts at zero, even before the next fetch
+    freezer.move_to("2026-11-13T18:00:00+00:00")
+    await _poll(hass)
+    assert _state(hass, "sensor.emma_fed_today") == "0.0"
+
+
+async def test_feeds_fetched_on_change(
+    hass: HomeAssistant,
+    loaded: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """The feed list is fetched again when the status shows a new feed."""
+
+    def count() -> int:
+        return sum(
+            call[0] == "GET" and "type=feed" in str(call[1]) for call in aioclient_mock.mock_calls
+        )
+
+    assert count() == 2
+    status = load("status")
+    status["data"]["lastActivities"]["feed"]["id"] = "feed-4"
+    mock_api(aioclient_mock, status_1=status)
+    await _poll(hass)
+    assert count() == 1  # only Emma's (the mock was reset)

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- **Fed today**: how much was fed since midnight, in millilitres, added
+  up from the bottle feeds logged with an amount (ounces are converted;
+  breastfeeds and solids have no volume and are left out). Attribute
+  `last_24_hours` has the same for the last 24 hours. The feed list is
+  fetched only when the status shows a new or changed feed, and every
+  15 minutes.
+
 ### Under the hood
 
 - The GitHub checks run on every push again (Actions had to be switched

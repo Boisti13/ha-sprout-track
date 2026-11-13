@@ -28,6 +28,8 @@ from .const import (
     DOSE_HISTORY,
     DOSE_KINDS,
     DOSE_LIMIT,
+    FEED_HISTORY,
+    FEED_LIMIT,
     MEASUREMENT_INTERVAL,
 )
 
@@ -64,6 +66,7 @@ class BabyData:
     measurements: dict[str, Any] = field(default_factory=dict)
     reference: dict[str, Any] = field(default_factory=dict)
     doses: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    feeds: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def name(self) -> str:
@@ -95,6 +98,26 @@ class BabyData:
             return doses
         folded = name.casefold()
         return [d for d in doses if dose_name(d, kind).casefold() == folded]
+
+    def fed_since(self, since: datetime) -> float:
+        """Return how much was fed since a time, in millilitres.
+
+        Counts the feeds logged with an amount in ml or oz (bottle feeds);
+        breastfeeds (a duration) and solids (grams) are left out.
+        """
+        total = 0.0
+        for feed in self.feeds:
+            details = feed.get("details") or {}
+            amount = details.get("amount")
+            factor = FEED_UNITS.get(str(details.get("unitAbbr") or "").upper())
+            when = dt_util.parse_datetime(str(feed.get("time")))
+            if factor and isinstance(amount, int | float) and when and when >= since:
+                total += amount * factor
+        return round(total, 1)
+
+
+# Millilitres per unit a feed amount can be logged in
+FEED_UNITS = {"ML": 1.0, "OZ": 29.5735}
 
 
 def dose_name(dose: dict[str, Any], kind: str) -> str:
@@ -130,6 +153,9 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         self._doses: dict[tuple[str, str], list[dict[str, Any]]] = {}
         # The last dose time each fetch saw in the status, per baby and kind
         self._dose_marks: dict[tuple[str, str], Any] = {}
+        self._feeds: dict[str, list[dict[str, Any]]] = {}
+        # The last feed each fetch saw in the status (ID and time), per baby
+        self._feed_marks: dict[str, Any] = {}
 
     async def _async_update_data(self) -> dict[str, BabyData]:
         try:
@@ -156,6 +182,7 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
                 self._measurements_at = now
 
             await self._update_doses(ids, statuses, now, refresh=slow_due)
+            await self._update_feeds(ids, statuses, now, refresh=slow_due)
         except SproutTrackAuthError as err:
             raise ConfigEntryAuthFailed(err.message) from err
         except SproutTrackApiError as err:
@@ -172,6 +199,7 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
                 measurements=self._measurements.get(baby_id, {}),
                 reference=self._references.get(baby_id, {}),
                 doses={kind: self._doses.get((baby_id, kind), []) for kind in DOSE_KINDS},
+                feeds=self._feeds.get(baby_id, []),
             )
             for baby_id, baby, status in zip(ids, babies, statuses, strict=True)
         }
@@ -209,6 +237,36 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         for key in [key for key in self._doses if key[0] not in ids]:
             del self._doses[key]
             self._dose_marks.pop(key, None)
+
+    async def _update_feeds(
+        self,
+        ids: list[str],
+        statuses: list[dict[str, Any]],
+        now: datetime,
+        *,
+        refresh: bool,
+    ) -> None:
+        """Fetch the last day's feeds when the status shows a new one (or on refresh)."""
+        since = (now - FEED_HISTORY).isoformat().replace("+00:00", "Z")
+        wanted: list[tuple[str, Any]] = []
+        for baby_id, status in zip(ids, statuses, strict=True):
+            feed = (status.get("lastActivities") or {}).get("feed") or {}
+            mark = (feed.get("id"), feed.get("time"), feed.get("amount"))
+            if refresh or baby_id not in self._feeds or self._feed_marks.get(baby_id) != mark:
+                wanted.append((baby_id, mark))
+        if wanted:
+            results = await asyncio.gather(
+                *(
+                    self.client.get_activities(baby_id, "feed", since, FEED_LIMIT)
+                    for baby_id, _ in wanted
+                )
+            )
+            for (baby_id, mark), feeds in zip(wanted, results, strict=True):
+                self._feeds[baby_id] = feeds
+                self._feed_marks[baby_id] = mark
+        for baby_id in [baby_id for baby_id in self._feeds if baby_id not in ids]:
+            del self._feeds[baby_id]
+            self._feed_marks.pop(baby_id, None)
 
     def invalidate_measurements(self) -> None:
         """Fetch the measurements again on the next update."""
