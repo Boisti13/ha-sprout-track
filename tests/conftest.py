@@ -40,6 +40,8 @@ def mock_api(
     babies: dict[str, Any] | None = None,
     status_1: dict[str, Any] | None = None,
     measurements_1: dict[str, Any] | None = None,
+    reference: dict[str, Any] | None = None,
+    activities: dict[str, dict[str, Any]] | None = None,
 ) -> None:
     """Answer every read endpoint for the two sample babies."""
     mock.clear_requests()
@@ -54,8 +56,17 @@ def mock_api(
         f"{API}/babies/{BABY_2}/measurements/latest",
         json={"success": True, "data": {"measurements": {}}},
     )
+    for kind in ("medicine", "supplement"):
+        mock.get(
+            f"{API}/babies/{BABY_1}/activities?type={kind}",
+            json=(activities or {}).get(kind) or load(f"{kind}_activities"),
+        )
+        mock.get(
+            f"{API}/babies/{BABY_2}/activities?type={kind}",
+            json={"success": True, "data": {"activities": [], "count": 0, "hasMore": False}},
+        )
     for baby in (BABY_1, BABY_2):
-        mock.get(f"{API}/babies/{baby}/reference", json=load("reference"))
+        mock.get(f"{API}/babies/{baby}/reference", json=reference or load("reference"))
         mock.post(
             f"{API}/babies/{baby}/activities",
             json={"success": True, "data": {"id": "new-1", "activityType": "x"}},

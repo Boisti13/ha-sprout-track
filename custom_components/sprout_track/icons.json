@@ -26,7 +26,11 @@
       "age": { "default": "mdi:cake-variant-outline" },
       "weight": { "default": "mdi:scale-baby" },
       "height": { "default": "mdi:human-male-height" },
-      "head_circumference": { "default": "mdi:tape-measure" }
+      "head_circumference": { "default": "mdi:tape-measure" },
+      "medicine_last_given": { "default": "mdi:pill" },
+      "medicine_next_dose": { "default": "mdi:clock-outline" },
+      "supplement_last_given": { "default": "mdi:eyedropper" },
+      "supplement_next_dose": { "default": "mdi:clock-outline" }
     },
     "binary_sensor": {
       "sleeping": { "default": "mdi:sleep-off", "state": { "on": "mdi:sleep" } },

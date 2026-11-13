@@ -1,10 +1,10 @@
-"""Sensors: last activities, today's counts, age and measurements."""
+"""Sensors: last activities, today's counts, age, measurements and doses."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -14,19 +14,33 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import UnitOfLength, UnitOfMass, UnitOfTemperature, UnitOfTime
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.util import dt as dt_util
 
-from .coordinator import BabyData, SproutTrackConfigEntry, SproutTrackCoordinator
+from .const import DOSE_KINDS
+from .coordinator import (
+    BabyData,
+    SproutTrackConfigEntry,
+    SproutTrackCoordinator,
+    dose_name,
+    parse_dose_gap,
+)
 from .entity import SproutTrackEntity, add_entities_per_baby
 
 # The coordinator polls; entities never fetch on their own.
 PARALLEL_UPDATES = 0
 
 SLEEP_STATES = ["awake", "nap", "night_sleep", "asleep"]
+
+# Sensors made per medicine and supplement (not in SENSORS: they come and go
+# with the medicines set up in Sprout Track).
+DOSE_TRANSLATION_KEYS = tuple(
+    f"{kind}_{which}" for kind in DOSE_KINDS for which in ("last_given", "next_dose")
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -68,6 +82,60 @@ def _diapers(*types: str) -> Callable[[BabyData], StateType]:
         return sum(by_type.get(diaper_type, 0) for diaper_type in types)
 
     return count
+
+
+def _next_dose(baby: BabyData, kind: str, dose: dict[str, Any]) -> datetime | None:
+    """Return when the next dose of a dose's medicine is allowed, if it has a gap."""
+    name = dose_name(dose, kind).casefold()
+    item = next((i for i in baby.items(kind) if str(i.get("name", "")).casefold() == name), None)
+    gap = parse_dose_gap(item.get("doseMinTime")) if item else None
+    given = _timestamp(dose.get("time"))
+    return given + gap if gap and given else None
+
+
+def _iso(value: datetime | None) -> str | None:
+    return dt_util.as_local(value).isoformat() if value else None
+
+
+def _dose_entry(kind: str, dose: dict[str, Any]) -> dict[str, Any]:
+    details = dose.get("details") or {}
+    return {
+        "time": _iso(_timestamp(dose.get("time"))),
+        "name": dose_name(dose, kind),
+        "amount": details.get("doseAmount"),
+        "unit": details.get("unitAbbr"),
+    }
+
+
+def _dose_lists(kind: str) -> Callable[[BabyData], dict[str, Any]]:
+    """Today's doses, and the latest dose of each one given in the last 24 hours."""
+
+    def attrs(baby: BabyData) -> dict[str, Any]:
+        doses = baby.doses_of(kind)
+        midnight = dt_util.start_of_local_day()
+        day_ago = dt_util.utcnow() - timedelta(hours=24)
+        today = [
+            _dose_entry(kind, d)
+            for d in doses
+            if (t := _timestamp(d.get("time"))) and t >= midnight
+        ]
+        latest: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for dose in doses:
+            given = _timestamp(dose.get("time"))
+            name = dose_name(dose, kind).casefold()
+            if not given or given < day_ago or name in seen:
+                continue
+            seen.add(name)
+            latest.append(
+                {
+                    **_dose_entry(kind, dose),
+                    "next_dose": _iso(_next_dose(baby, kind, dose)),
+                }
+            )
+        return {"doses": today, "latest": latest}
+
+    return attrs
 
 
 def _sleep_state(baby: BabyData) -> str | None:
@@ -226,12 +294,14 @@ SENSORS: tuple[SproutTrackSensorDescription, ...] = (
         translation_key="medicines_today",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=_count("medicines"),
+        attrs_fn=_dose_lists("medicine"),
     ),
     SproutTrackSensorDescription(
         key="supplements_today",
         translation_key="supplements_today",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=_count("supplements"),
+        attrs_fn=_dose_lists("supplement"),
     ),
     # --- the baby ----------------------------------------------------------
     SproutTrackSensorDescription(
@@ -317,6 +387,51 @@ async def async_setup_entry(
         ]
 
     add_entities_per_baby(entry, async_add_entities, factory)
+    _add_dose_sensors(hass, entry, async_add_entities)
+
+
+def _add_dose_sensors(
+    hass: HomeAssistant,
+    entry: SproutTrackConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+) -> None:
+    """Keep one sensor per medicine and supplement, as they come and go.
+
+    Every one gets *last given*; those with a minimum time between doses
+    also get *next dose*.
+    """
+    coordinator = entry.runtime_data
+    known: dict[tuple[str, str, str, str], SproutTrackDoseSensor] = {}
+
+    @callback
+    def _check() -> None:
+        wanted: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+        for baby_id, baby in coordinator.data.items():
+            for kind in DOSE_KINDS:
+                for item in baby.items(kind):
+                    item_id = str(item["id"])
+                    wanted[(baby_id, kind, item_id, "last_given")] = item
+                    if parse_dose_gap(item.get("doseMinTime")):
+                        wanted[(baby_id, kind, item_id, "next_dose")] = item
+
+        registry = er.async_get(hass)
+        for key in known.keys() - wanted.keys():
+            entity = known.pop(key)
+            if entity.entity_id and registry.async_get(entity.entity_id):
+                registry.async_remove(entity.entity_id)
+            elif entity.hass is not None:
+                hass.async_create_task(entity.async_remove())
+
+        new = [
+            SproutTrackDoseSensor(coordinator, *key, name=str(wanted[key].get("name") or ""))
+            for key in sorted(wanted.keys() - known.keys())
+        ]
+        if new:
+            known.update({entity.dose_key: entity for entity in new})
+            async_add_entities(new)
+
+    _check()
+    entry.async_on_unload(coordinator.async_add_listener(_check))
 
 
 class SproutTrackSensor(SproutTrackEntity, SensorEntity):
@@ -394,3 +509,77 @@ class SproutTrackMeasurementSensor(SproutTrackEntity, SensorEntity):
         """Return the day it was measured."""
         date = self._measurement.get("date")
         return {"date": date} if date else None
+
+
+class SproutTrackDoseSensor(SproutTrackEntity, SensorEntity):
+    """When one medicine (or supplement) was last given, or may be given next."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(
+        self,
+        coordinator: SproutTrackCoordinator,
+        baby_id: str,
+        kind: str,
+        item_id: str,
+        which: str,
+        *,
+        name: str,
+    ) -> None:
+        """Set up the sensor; the medicine's name goes into the entity name."""
+        super().__init__(coordinator, baby_id, f"{kind}_{item_id}_{which}")
+        self.dose_key = (baby_id, kind, item_id, which)
+        self._kind = kind
+        self._item_id = item_id
+        self._which = which
+        self._attr_translation_key = f"{kind}_{which}"
+        self._attr_translation_placeholders = {"name": name}
+
+    @property
+    def _item(self) -> dict[str, Any] | None:
+        return self.baby.item(self._kind, self._item_id)
+
+    @property
+    def _last_dose(self) -> dict[str, Any] | None:
+        item = self._item
+        if item is None:
+            return None
+        doses = self.baby.doses_of(self._kind, str(item.get("name") or ""))
+        return doses[0] if doses else None
+
+    @property
+    def available(self) -> bool:
+        """Return whether Sprout Track still lists this medicine."""
+        return super().available and self._item is not None
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Return the time of the last dose, or when the next one is allowed."""
+        dose = self._last_dose
+        if dose is None:
+            return None
+        if self._which == "last_given":
+            return _timestamp(dose.get("time"))
+        return _next_dose(self.baby, self._kind, dose)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return the last dose's amount, today's count and the minimum gap."""
+        item = self._item or {}
+        dose = self._last_dose
+        details = (dose or {}).get("details") or {}
+        midnight = dt_util.start_of_local_day()
+        name = str(item.get("name") or "")
+        attrs: dict[str, Any] = {
+            "amount": details.get("doseAmount"),
+            "unit": details.get("unitAbbr") or item.get("unitAbbr"),
+            "doses_today": sum(
+                1
+                for d in self.baby.doses_of(self._kind, name)
+                if (t := _timestamp(d.get("time"))) and t >= midnight
+            ),
+        }
+        gap = parse_dose_gap(item.get("doseMinTime"))
+        if gap:
+            attrs["minimum_gap_minutes"] = int(gap.total_seconds() // 60)
+        return {key: value for key, value in attrs.items() if value is not None}

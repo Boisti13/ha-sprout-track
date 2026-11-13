@@ -19,4 +19,11 @@ MAX_SCAN_INTERVAL = 3600
 # API's 60 reads per minute.
 MEASUREMENT_INTERVAL = timedelta(minutes=15)
 
+# Medicines and supplements: the doses of each kind are fetched when the
+# status shows a new one, and with the measurements (to catch edits and
+# deletions); the list of medicines with the measurements too.
+DOSE_KINDS = ("medicine", "supplement")
+DOSE_HISTORY = timedelta(days=30)
+DOSE_LIMIT = 50  # the API's maximum
+
 MANUFACTURER = "Sprout Track"

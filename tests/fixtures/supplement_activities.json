@@ -1,0 +1,26 @@
+{
+  "success": true,
+  "data": {
+    "activities": [
+      {
+        "activityType": "supplement",
+        "id": "supplement-log-1",
+        "time": "2026-11-12T13:38:21.908Z",
+        "details": {
+          "supplementName": "Vitamin D",
+          "doseAmount": 1,
+          "unitAbbr": "DROP",
+          "notes": null
+        },
+        "caretakerName": null
+      }
+    ],
+    "count": 1,
+    "hasMore": false
+  },
+  "meta": {
+    "timestamp": "2026-11-12T18:00:00.000Z",
+    "familyId": "family-1",
+    "babyId": "baby-1"
+  }
+}

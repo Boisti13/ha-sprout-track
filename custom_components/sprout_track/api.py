@@ -140,6 +140,15 @@ class SproutTrackClient:
         data, _ = await self._request("GET", f"/babies/{baby_id}/reference", params=params)
         return data or {}
 
+    async def get_activities(
+        self, baby_id: str, activity_type: str, since: str, limit: int
+    ) -> list[dict[str, Any]]:
+        """Return a baby's activities of one type since a time, newest first."""
+        params = {"type": activity_type, "since": since, "limit": str(limit)}
+        data, _ = await self._request("GET", f"/babies/{baby_id}/activities", params=params)
+        activities = (data or {}).get("activities") or []
+        return [a for a in activities if isinstance(a, dict) and a.get("time")]
+
     async def create_activity(self, baby_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Log an activity; return what the API created."""
         data, _ = await self._request("POST", f"/babies/{baby_id}/activities", json=payload)

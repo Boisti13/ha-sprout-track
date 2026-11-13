@@ -322,7 +322,10 @@ def test_translations_cover_everything() -> None:
             ("binary_sensor", binary_sensor.BINARY_SENSORS),
             ("button", button.BUTTONS),
         ):
-            assert set(strings["entity"][platform]) == {d.translation_key for d in descriptions}
+            expected = {d.translation_key for d in descriptions}
+            if platform == "sensor":
+                expected |= set(sensor.DOSE_TRANSLATION_KEYS)
+            assert set(strings["entity"][platform]) == expected
         assert set(strings["entity"]["sensor"]["sleep_state"]["state"]) == set(sensor.SLEEP_STATES)
 
 

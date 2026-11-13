@@ -26,6 +26,9 @@ project and not part of Sprout Track.
 - **24 sensors per baby**: last feed, diaper, sleep, bath, medicine and
   supplement; today's counts; age; latest weight, height, head
   circumference and temperature.
+- **Per medicine and supplement**: when it was last given and, where
+  Sprout Track has a minimum time between doses, when the next dose is
+  allowed. They follow the medicines set up in Sprout Track.
 - **Times, not counters**: "last feed" is a point in time, which Home
   Assistant shows as "2 hours ago" without the value changing every minute.
 - **Warnings as binary sensors**: feed overdue and diaper overdue, using
@@ -86,9 +89,28 @@ Entity IDs start with the baby's first name, e.g. `sensor.emma_last_feed`.
 | Dirty diapers today | count (dirty, and wet-and-dirty) | |
 | Sleep today | hours | |
 | Naps today | count | |
-| Baths / Medicines / Supplements today | count | |
+| Baths today | count | |
+| Medicines / Supplements today | count | `doses`, `latest` (below) |
 | Age | days | `birth_date`, `age_text` |
 | Weight, Height, Head circumference, Temperature | latest measurement, in the unit it was logged in | `date` |
+
+**Per medicine and supplement** set up in Sprout Track, e.g.
+`sensor.emma_paracetamol_last_given`:
+
+| Sensor | Value | Attributes |
+|---|---|---|
+| *Name* last given | time of the last dose (last 30 days) | `amount`, `unit`, `doses_today`, `minimum_gap_minutes` |
+| *Name* next dose | time the next dose is allowed (in the past once it is) | same |
+
+*Next dose* exists only for medicines with a minimum time between doses
+(see *Good to know*). A medicine deleted in Sprout Track loses its sensors.
+
+*Medicines today* and *Supplements today* carry two lists for dashboards
+and templates, newest first, times in local time:
+
+- `doses`: every dose since midnight — `time`, `name`, `amount`, `unit`
+- `latest`: each medicine given in the last 24 hours once, its latest
+  dose, plus `next_dose` (or `null`)
 
 "Today" starts at midnight in Home Assistant's time zone. Sleep that began
 before midnight counts from midnight on. A left-and-right nursing session
@@ -132,6 +154,20 @@ returns what Sprout Track created if you ask for the response.
 | `sprout_track.log_activity` | `data`: any body the [API](https://github.com/Oak-and-Sprout/sprout-track/blob/main/documentation/Admin-Documentation/webhook-api.md) accepts (feed, bath, note, pump, measurement, food, play, ...) |
 
 ## Examples
+
+A reminder when the next dose is allowed again:
+
+```yaml
+automation:
+  - alias: Paracetamol – Next dose allowed
+    triggers:
+      - trigger: time
+        at: sensor.emma_paracetamol_next_dose
+    actions:
+      - action: notify.mobile_app_phone
+        data:
+          message: Emma may have Paracetamol again.
+```
 
 A Zigbee button on the changing table: one press wet, double press dirty.
 
@@ -203,10 +239,15 @@ automation:
   up with the next update.
 - **API limits:** Sprout Track allows each key 60 reads and 30 writes per
   minute. An update costs one read plus one per baby; give other tools
-  their own key.
+  their own key. Doses are only fetched when the status shows a new one.
 - **Read-only key:** sensors work; buttons and actions answer "This key
   does not have 'write' scope".
-- **Measurements** are fetched every 15 minutes.
+- **Measurements**, the list of medicines and all doses are fetched every
+  15 minutes (so edits and deletions in Sprout Track show up).
+- **Next dose** needs a Sprout Track whose hooks API sends each medicine's
+  minimum time between doses (`doseMinTime`). Released versions don't yet
+  ([Oak-and-Sprout/sprout-track#298](https://github.com/Oak-and-Sprout/sprout-track/issues/298));
+  until then only *last given* appears.
 - **Removing a baby:** a baby made inactive in Sprout Track loses its
   device in Home Assistant at the next update.
 - **Troubleshooting:** *Download diagnostics* on the integration gives a
