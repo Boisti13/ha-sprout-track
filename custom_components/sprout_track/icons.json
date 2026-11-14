@@ -38,7 +38,9 @@
       "feed_overdue": { "default": "mdi:baby-bottle-outline" },
       "diaper_overdue": { "default": "mdi:human-baby-changing-table" },
       "breastfeeding": { "default": "mdi:mother-nurse" },
-      "pumping": { "default": "mdi:mother-nurse" }
+      "pumping": { "default": "mdi:mother-nurse" },
+      "medicine_dose_allowed": { "default": "mdi:timer-sand", "state": { "on": "mdi:pill" } },
+      "supplement_dose_allowed": { "default": "mdi:timer-sand", "state": { "on": "mdi:pill" } }
     },
     "button": {
       "log_wet_diaper": { "default": "mdi:water-outline" },
@@ -62,6 +64,8 @@
     "log_supplement": { "service": "mdi:eyedropper" },
     "log_activity": { "service": "mdi:notebook-plus-outline" },
     "log_feed": { "service": "mdi:baby-bottle-outline" },
-    "breastfeeding": { "service": "mdi:mother-nurse" }
+    "breastfeeding": { "service": "mdi:mother-nurse" },
+    "log_bath": { "service": "mdi:bathtub-outline" },
+    "log_measurement": { "service": "mdi:scale-baby" }
   }
 }

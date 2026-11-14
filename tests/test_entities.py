@@ -8,17 +8,24 @@ from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import (
+    device_registry as dr,
+    entity_registry as er,
+    issue_registry as ir,
+)
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
+import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
 )
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
+from custom_components.sprout_track import coordinator as coordinator_module
 from custom_components.sprout_track.const import DOMAIN, DOSE_LIMIT
 from custom_components.sprout_track.coordinator import merge_doses, parse_dose_gap
+from custom_components.sprout_track.entity import attribute_value
 
 from .conftest import API, BABY_1, BABY_2, api_error, load, mock_api
 
@@ -58,12 +65,12 @@ async def test_sensors(hass: HomeAssistant, loaded: MockConfigEntry) -> None:
     """Values come out of the recorded status as expected."""
     assert _state(hass, "sensor.emma_last_feed") == "2026-11-12T13:38:21+00:00"
     feed = hass.states.get("sensor.emma_last_feed").attributes
-    assert feed["feed_type"] == "BOTTLE"
+    assert feed["feed_type"] == "bottle"
     assert feed["amount"] == 120
     assert "caretaker" not in feed  # empty fields are left out
 
     assert _state(hass, "sensor.emma_last_diaper") == "2026-11-12T13:38:21+00:00"
-    assert hass.states.get("sensor.emma_last_diaper").attributes["diaper_type"] == "WET"
+    assert hass.states.get("sensor.emma_last_diaper").attributes["diaper_type"] == "wet"
     assert _state(hass, "sensor.emma_sleep_state") == "awake"
     assert _state(hass, "sensor.emma_asleep_since") == STATE_UNKNOWN
     assert _state(hass, "sensor.emma_awake_since") == "2026-11-12T09:45:00+00:00"
@@ -135,7 +142,7 @@ async def test_asleep_and_timers(
     await _poll(hass)
 
     assert _state(hass, "binary_sensor.emma_sleeping") == "on"
-    assert hass.states.get("binary_sensor.emma_sleeping").attributes["sleep_type"] == "NIGHT_SLEEP"
+    assert hass.states.get("binary_sensor.emma_sleeping").attributes["sleep_type"] == "night_sleep"
     assert _state(hass, "sensor.emma_sleep_state") == "night_sleep"
     assert _state(hass, "sensor.emma_asleep_since") == "2026-11-12T19:00:00+00:00"
     assert _state(hass, "sensor.emma_awake_since") == STATE_UNKNOWN
@@ -143,7 +150,7 @@ async def test_asleep_and_timers(
     assert _state(hass, "binary_sensor.emma_pumping") == "on"
     assert _state(hass, "sensor.emma_last_pump") == "2026-11-12T19:01:00+00:00"
     assert _state(hass, "binary_sensor.emma_breastfeeding") == "on"
-    assert hass.states.get("binary_sensor.emma_breastfeeding").attributes["side"] == "LEFT"
+    assert hass.states.get("binary_sensor.emma_breastfeeding").attributes["side"] == "left"
 
     # A sleep type this version does not know still counts as asleep
     last["sleep"]["type"] = None
@@ -344,6 +351,8 @@ async def test_rate_limit_waits(
     hass: HomeAssistant, loaded: MockConfigEntry, aioclient_mock: AiohttpClientMocker
 ) -> None:
     """After HTTP 429 the next update waits as long as Retry-After says."""
+    if not coordinator_module._UPDATE_FAILED_RETRY_AFTER:
+        pytest.skip("this Home Assistant has no retry_after")
     aioclient_mock.clear_requests()
     aioclient_mock.get(
         f"{API}/babies", status=429, json=api_error("RATE_LIMITED"), headers={"Retry-After": "300"}
@@ -692,3 +701,112 @@ def test_merge_doses() -> None:
     ]
     assert [d["id"] for d in merge_doses(cached, fresh, since, 3)] == ["n0", "n1", "n2", "old"]
     assert merge_doses(cached, fresh, since, 4) == fresh
+
+
+async def test_dose_allowed(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """*Dose allowed* turns on by itself once the minimum gap has passed."""
+    freezer.move_to("2026-11-12T15:00:00+00:00")  # last dose 13:38, gap 4 h
+    mock_api(aioclient_mock, reference=_reference_with_gap())
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    allowed = hass.states.get("binary_sensor.emma_paracetamol_dose_allowed")
+    assert allowed.state == "off"
+    assert allowed.attributes["allowed_from"] == "2026-11-12T09:38:21.893000-08:00"  # local
+    # Never given (Mia): allowed; no gap (Vitamin D): no such sensor
+    assert _state(hass, "binary_sensor.mia_paracetamol_dose_allowed") == "on"
+    assert hass.states.get("binary_sensor.emma_vitamin_d_dose_allowed") is None
+
+    # An update shortly before: still off
+    freezer.move_to("2026-11-12T17:38:00+00:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert _state(hass, "binary_sensor.emma_paracetamol_dose_allowed") == "off"
+
+    # 22 seconds later, before the next update is due, it turns on by itself
+    calls = aioclient_mock.call_count
+    freezer.move_to("2026-11-12T17:38:22+00:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    allowed = hass.states.get("binary_sensor.emma_paracetamol_dose_allowed")
+    assert allowed.state == "on"
+    assert "allowed_from" not in allowed.attributes
+    assert aioclient_mock.call_count == calls  # no update needed for that
+
+    # The gap removed in Sprout Track: the sensor goes after the usual day
+    mock_api(aioclient_mock)
+    freezer.tick(timedelta(minutes=16))
+    await _poll(hass)
+    assert _state(hass, "binary_sensor.emma_paracetamol_dose_allowed") == STATE_UNAVAILABLE
+    freezer.tick(timedelta(hours=24))
+    await _poll(hass)
+    assert hass.states.get("binary_sensor.emma_paracetamol_dose_allowed") is None
+    assert er.async_get(hass).async_get("binary_sensor.emma_paracetamol_dose_allowed") is None
+
+
+async def test_device_follows_baby_name(
+    hass: HomeAssistant, loaded: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """A baby renamed in Sprout Track renames the device; entity IDs stay."""
+    babies = load("babies")
+    babies["data"]["babies"][0]["firstName"] = "Emilia"
+    mock_api(aioclient_mock, babies=babies)
+    await _poll(hass)
+    device = _device(hass, loaded, BABY_1)
+    assert device.name == "Emilia"
+    assert hass.states.get("sensor.emma_last_feed").attributes["friendly_name"] == (
+        "Emilia Last feed"
+    )
+
+    # A name given in Home Assistant is left alone
+    dr.async_get(hass).async_update_device(device.id, name_by_user="Our Emma")
+    babies["data"]["babies"][0]["firstName"] = "Em"
+    mock_api(aioclient_mock, babies=babies)
+    await _poll(hass)
+    device = _device(hass, loaded, BABY_1)
+    assert (device.name, device.name_by_user) == ("Em", "Our Emma")
+
+
+async def test_notice_without_dose_gaps(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """A server without minimum gaps gets a Repairs notice, gone once it sends them."""
+    issues = ir.async_get(hass)
+    issue_id = f"no_dose_min_time_{entry.entry_id}"
+    mock_api(aioclient_mock)  # the recorded reference has no doseMinTime
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    issue = issues.async_get_issue(DOMAIN, issue_id)
+    assert issue is not None
+    assert issue.translation_placeholders == {"title": "Emma & Mia"}
+
+    mock_api(aioclient_mock, reference=_reference_with_gap())
+    freezer.tick(timedelta(minutes=16))
+    await _poll(hass)
+    assert issues.async_get_issue(DOMAIN, issue_id) is None
+
+    # Removing the entry takes a notice with it
+    mock_api(aioclient_mock)
+    freezer.tick(timedelta(minutes=16))
+    await _poll(hass)
+    assert issues.async_get_issue(DOMAIN, issue_id) is not None
+    assert await hass.config_entries.async_remove(entry.entry_id)
+    assert issues.async_get_issue(DOMAIN, issue_id) is None
+
+
+def test_attribute_values() -> None:
+    """Fixed words become options; anything else stays as it was."""
+    assert attribute_value("bottle_type", "Breast Milk") == "breast_milk"
+    assert attribute_value("bottle_type", "formula/breast") == "formula_breast"
+    assert attribute_value("bath_type", "Sponge Bath") == "sponge_bath"
+    assert attribute_value("bath_type", "Bucket bath") == "Bucket bath"
+    assert attribute_value("diaper_type", None) is None
+    assert attribute_value("caretaker", "WET") == "WET"

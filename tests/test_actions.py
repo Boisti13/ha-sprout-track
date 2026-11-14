@@ -12,6 +12,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.sprout_track.const import DOMAIN
+from custom_components.sprout_track.entity import ATTRIBUTE_OPTIONS
 
 from .conftest import API, BABY_1, BABY_2, api_error, load, mock_api
 
@@ -329,6 +330,57 @@ async def test_breastfeeding_timer(
     assert err.value.translation_placeholders["code"] == "FEED_ALREADY_ACTIVE"
 
 
+async def test_log_bath(
+    hass: HomeAssistant, one_baby: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """The app's bath types are sent in its spelling; custom ones as typed."""
+    await _call(
+        hass,
+        "log_bath",
+        {"bath_type": "sponge_bath", "soap_used": False, "shampoo_used": True, "notes": "x"},
+    )
+    await _call(hass, "log_bath", {"bath_type": "Bucket bath"})
+    await _call(hass, "log_bath", {})
+    assert _posts(aioclient_mock) == [
+        (
+            BABY_1,
+            {
+                "type": "bath",
+                "bathType": "Sponge Bath",
+                "soapUsed": False,
+                "shampooUsed": True,
+                "notes": "x",
+            },
+        ),
+        (BABY_1, {"type": "bath", "bathType": "Bucket bath"}),
+        (BABY_1, {"type": "bath"}),
+    ]
+
+
+async def test_log_measurement(
+    hass: HomeAssistant, one_baby: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """A measurement is sent, and the measurements are fetched again at once."""
+    before = sum("/measurements" in str(c[1]) for c in aioclient_mock.mock_calls)
+    await _call(
+        hass,
+        "log_measurement",
+        {"measurement_type": "head_circumference", "value": 41.0, "unit": "CM"},
+    )
+    assert _posts(aioclient_mock) == [
+        (
+            BABY_1,
+            {
+                "type": "measurement",
+                "measurementType": "HEAD_CIRCUMFERENCE",
+                "value": 41,
+                "unit": "CM",
+            },
+        )
+    ]
+    assert sum("/measurements" in str(c[1]) for c in aioclient_mock.mock_calls) == before + 1
+
+
 async def test_errors(
     hass: HomeAssistant, one_baby: MockConfigEntry, aioclient_mock: AiohttpClientMocker
 ) -> None:
@@ -439,8 +491,16 @@ def test_translations_cover_everything() -> None:
             expected = {d.translation_key for d in descriptions}
             if platform == "sensor":
                 expected |= set(sensor.DOSE_TRANSLATION_KEYS)
+            if platform == "binary_sensor":
+                expected |= set(binary_sensor.DOSE_TRANSLATION_KEYS)
             assert set(strings["entity"][platform]) == expected
         assert set(strings["entity"]["sensor"]["sleep_state"]["state"]) == set(sensor.SLEEP_STATES)
+        # Attributes with fixed values: every option has a text
+        for platform, entities in strings["entity"].items():
+            for name, texts in entities.items():
+                for attr, attr_texts in (texts.get("state_attributes") or {}).items():
+                    options = set(ATTRIBUTE_OPTIONS[attr].values())
+                    assert set(attr_texts["state"]) == options, (platform, name, attr)
 
 
 def test_brand_icons() -> None:

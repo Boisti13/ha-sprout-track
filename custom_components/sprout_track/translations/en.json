@@ -65,8 +65,34 @@
   },
   "entity": {
     "sensor": {
-      "last_feed": { "name": "Last feed" },
-      "last_diaper": { "name": "Last diaper" },
+      "last_feed": {
+        "name": "Last feed",
+        "state_attributes": {
+          "feed_type": {
+            "name": "Feed type",
+            "state": { "breast": "Breast", "bottle": "Bottle", "solids": "Solids" }
+          },
+          "bottle_type": {
+            "name": "Bottle content",
+            "state": {
+              "formula": "Formula",
+              "breast_milk": "Breast milk",
+              "formula_breast": "Formula and breast milk",
+              "milk": "Milk",
+              "other": "Other"
+            }
+          }
+        }
+      },
+      "last_diaper": {
+        "name": "Last diaper",
+        "state_attributes": {
+          "diaper_type": {
+            "name": "Diaper",
+            "state": { "wet": "Wet", "dirty": "Dirty", "both": "Wet and dirty", "dry": "Dry" }
+          }
+        }
+      },
       "sleep_state": {
         "name": "Sleep state",
         "state": {
@@ -78,8 +104,28 @@
       },
       "asleep_since": { "name": "Asleep since" },
       "awake_since": { "name": "Awake since" },
-      "last_sleep_duration": { "name": "Last sleep duration" },
-      "last_bath": { "name": "Last bath" },
+      "last_sleep_duration": {
+        "name": "Last sleep duration",
+        "state_attributes": {
+          "sleep_type": {
+            "name": "Sleep type",
+            "state": { "nap": "Nap", "night_sleep": "Night sleep" }
+          }
+        }
+      },
+      "last_bath": {
+        "name": "Last bath",
+        "state_attributes": {
+          "bath_type": {
+            "name": "Bath type",
+            "state": {
+              "full_bath": "Full bath",
+              "sponge_bath": "Sponge bath",
+              "wipe_down": "Wipe down"
+            }
+          }
+        }
+      },
       "last_medicine": { "name": "Last medicine" },
       "last_supplement": { "name": "Last supplement" },
       "last_pump": { "name": "Last pump" },
@@ -104,11 +150,26 @@
       "supplement_next_dose": { "name": "{name} next dose" }
     },
     "binary_sensor": {
-      "sleeping": { "name": "Sleeping" },
+      "sleeping": {
+        "name": "Sleeping",
+        "state_attributes": {
+          "sleep_type": {
+            "name": "Sleep type",
+            "state": { "nap": "Nap", "night_sleep": "Night sleep" }
+          }
+        }
+      },
       "feed_overdue": { "name": "Feed overdue" },
       "diaper_overdue": { "name": "Diaper overdue" },
-      "breastfeeding": { "name": "Breastfeeding" },
-      "pumping": { "name": "Pumping" }
+      "breastfeeding": {
+        "name": "Breastfeeding",
+        "state_attributes": {
+          "side": { "name": "Side", "state": { "left": "Left", "right": "Right" } }
+        }
+      },
+      "pumping": { "name": "Pumping" },
+      "medicine_dose_allowed": { "name": "{name} dose allowed" },
+      "supplement_dose_allowed": { "name": "{name} dose allowed" }
     },
     "button": {
       "log_wet_diaper": { "name": "Log wet diaper" },
@@ -164,6 +225,21 @@
         "pause": "Pause",
         "resume": "Resume",
         "end": "End"
+      }
+    },
+    "bath_type": {
+      "options": {
+        "full_bath": "Full bath",
+        "sponge_bath": "Sponge bath",
+        "wipe_down": "Wipe down"
+      }
+    },
+    "measurement_type": {
+      "options": {
+        "weight": "Weight",
+        "height": "Height",
+        "head_circumference": "Head circumference",
+        "temperature": "Temperature"
       }
     }
   },
@@ -301,6 +377,55 @@
           "description": "Name of a caretaker as set up in Sprout Track."
         }
       }
+    },
+    "log_bath": {
+      "name": "Log bath",
+      "description": "Logs a bath.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Can be left out while only one baby is set up."
+        },
+        "bath_type": {
+          "name": "Bath type",
+          "description": "One of the app's bath types, or your own text."
+        },
+        "soap_used": {
+          "name": "Soap",
+          "description": "Whether soap was used. Sprout Track assumes yes if left out."
+        },
+        "shampoo_used": {
+          "name": "Shampoo",
+          "description": "Whether shampoo was used. Sprout Track assumes yes if left out."
+        },
+        "notes": { "name": "Notes", "description": "Free text." },
+        "time": { "name": "Time", "description": "When the bath was. Now if left out." },
+        "caretaker": {
+          "name": "Caretaker",
+          "description": "Name of a caretaker as set up in Sprout Track."
+        }
+      }
+    },
+    "log_measurement": {
+      "name": "Log measurement",
+      "description": "Logs a weight, height, head circumference or temperature.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Can be left out while only one baby is set up."
+        },
+        "measurement_type": { "name": "Measurement", "description": "What was measured." },
+        "value": { "name": "Value", "description": "The measured value." },
+        "unit": {
+          "name": "Unit",
+          "description": "Unit as set up in Sprout Track, for example KG, LB, CM, IN, C or F."
+        },
+        "time": { "name": "Time", "description": "When it was measured. Now if left out." },
+        "caretaker": {
+          "name": "Caretaker",
+          "description": "Name of a caretaker as set up in Sprout Track."
+        }
+      }
     }
   },
   "exceptions": {
@@ -316,5 +441,11 @@
     "side_required": { "message": "Give a side (left or right) to start breastfeeding." },
     "feed_field_mismatch": { "message": "{field} does not apply to a {feed_type} feed." },
     "unit_required": { "message": "Give the unit (for example ML or OZ) with the amount." }
+  },
+  "issues": {
+    "no_dose_min_time": {
+      "title": "{title}: no times between doses from Sprout Track",
+      "description": "Your Sprout Track server doesn't send the minimum time between doses of its medicines, so the *… next dose* and *… dose allowed* entities can't be shown; *… last given* works. Released versions of Sprout Track don't send it yet. Once a version that does is installed, this notice goes away by itself."
+    }
   }
 }

@@ -179,6 +179,49 @@ breastfeeding:
     side: *side
     caretaker: *caretaker
 
+log_bath:
+  fields:
+    device_id: *baby
+    bath_type:
+      selector:
+        select:
+          translation_key: bath_type
+          custom_value: true
+          options: [full_bath, sponge_bath, wipe_down]
+    soap_used:
+      selector:
+        boolean:
+    shampoo_used:
+      selector:
+        boolean:
+    notes: *notes
+    time: *time
+    caretaker: *caretaker
+
+log_measurement:
+  fields:
+    device_id: *baby
+    measurement_type:
+      required: true
+      selector:
+        select:
+          translation_key: measurement_type
+          options: [weight, height, head_circumference, temperature]
+    value:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000
+          step: any
+          mode: box
+    unit:
+      example: KG
+      selector:
+        text:
+    time: *time
+    caretaker: *caretaker
+
 log_activity:
   fields:
     device_id: *baby

@@ -66,10 +66,32 @@
   "entity": {
     "sensor": {
       "last_feed": {
-        "name": "Letzte Mahlzeit"
+        "name": "Letzte Mahlzeit",
+        "state_attributes": {
+          "feed_type": {
+            "name": "Art",
+            "state": { "breast": "Brust", "bottle": "Flasche", "solids": "Beikost" }
+          },
+          "bottle_type": {
+            "name": "Flascheninhalt",
+            "state": {
+              "formula": "Pre-Nahrung",
+              "breast_milk": "Muttermilch",
+              "formula_breast": "Pre-Nahrung und Muttermilch",
+              "milk": "Milch",
+              "other": "Andere"
+            }
+          }
+        }
       },
       "last_diaper": {
-        "name": "Letzte Windel"
+        "name": "Letzte Windel",
+        "state_attributes": {
+          "diaper_type": {
+            "name": "Windel",
+            "state": { "wet": "Nass", "dirty": "Voll", "both": "Nass und voll", "dry": "Trocken" }
+          }
+        }
       },
       "sleep_state": {
         "name": "Schlafzustand",
@@ -87,10 +109,26 @@
         "name": "Wach seit"
       },
       "last_sleep_duration": {
-        "name": "Dauer des letzten Schlafs"
+        "name": "Dauer des letzten Schlafs",
+        "state_attributes": {
+          "sleep_type": {
+            "name": "Schlafart",
+            "state": { "nap": "Nickerchen", "night_sleep": "Nachtschlaf" }
+          }
+        }
       },
       "last_bath": {
-        "name": "Letztes Bad"
+        "name": "Letztes Bad",
+        "state_attributes": {
+          "bath_type": {
+            "name": "Badeart",
+            "state": {
+              "full_bath": "Vollbad",
+              "sponge_bath": "Waschen mit Schwamm",
+              "wipe_down": "Abwischen"
+            }
+          }
+        }
       },
       "last_medicine": {
         "name": "Letztes Medikament"
@@ -161,7 +199,13 @@
     },
     "binary_sensor": {
       "sleeping": {
-        "name": "Schläft"
+        "name": "Schläft",
+        "state_attributes": {
+          "sleep_type": {
+            "name": "Schlafart",
+            "state": { "nap": "Nickerchen", "night_sleep": "Nachtschlaf" }
+          }
+        }
       },
       "feed_overdue": {
         "name": "Mahlzeit überfällig"
@@ -170,11 +214,16 @@
         "name": "Windel überfällig"
       },
       "breastfeeding": {
-        "name": "Stillen"
+        "name": "Stillen",
+        "state_attributes": {
+          "side": { "name": "Seite", "state": { "left": "Links", "right": "Rechts" } }
+        }
       },
       "pumping": {
         "name": "Abpumpen"
-      }
+      },
+      "medicine_dose_allowed": { "name": "{name} erlaubt" },
+      "supplement_dose_allowed": { "name": "{name} erlaubt" }
     },
     "button": {
       "log_wet_diaper": {
@@ -260,6 +309,21 @@
         "pause": "Pausieren",
         "resume": "Fortsetzen",
         "end": "Beenden"
+      }
+    },
+    "bath_type": {
+      "options": {
+        "full_bath": "Vollbad",
+        "sponge_bath": "Waschen mit Schwamm",
+        "wipe_down": "Abwischen"
+      }
+    },
+    "measurement_type": {
+      "options": {
+        "weight": "Gewicht",
+        "height": "Größe",
+        "head_circumference": "Kopfumfang",
+        "temperature": "Temperatur"
       }
     }
   },
@@ -532,6 +596,55 @@
           "description": "Name einer Betreuungsperson, wie in Sprout Track eingerichtet."
         }
       }
+    },
+    "log_bath": {
+      "name": "Bad eintragen",
+      "description": "Trägt ein Bad ein.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Kann entfallen, solange nur ein Baby eingerichtet ist."
+        },
+        "bath_type": {
+          "name": "Badeart",
+          "description": "Eine der Badearten der App oder ein eigener Text."
+        },
+        "soap_used": {
+          "name": "Seife",
+          "description": "Ob Seife benutzt wurde. Sprout Track nimmt ja an, wenn leer."
+        },
+        "shampoo_used": {
+          "name": "Shampoo",
+          "description": "Ob Shampoo benutzt wurde. Sprout Track nimmt ja an, wenn leer."
+        },
+        "notes": { "name": "Notizen", "description": "Freitext." },
+        "time": { "name": "Zeit", "description": "Wann gebadet wurde. Jetzt, wenn leer." },
+        "caretaker": {
+          "name": "Betreuungsperson",
+          "description": "Name einer Betreuungsperson, wie in Sprout Track eingerichtet."
+        }
+      }
+    },
+    "log_measurement": {
+      "name": "Messung eintragen",
+      "description": "Trägt Gewicht, Größe, Kopfumfang oder Temperatur ein.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Kann entfallen, solange nur ein Baby eingerichtet ist."
+        },
+        "measurement_type": { "name": "Messung", "description": "Was gemessen wurde." },
+        "value": { "name": "Wert", "description": "Der gemessene Wert." },
+        "unit": {
+          "name": "Einheit",
+          "description": "Einheit wie in Sprout Track eingerichtet, zum Beispiel KG, LB, CM, IN, C oder F."
+        },
+        "time": { "name": "Zeit", "description": "Wann gemessen wurde. Jetzt, wenn leer." },
+        "caretaker": {
+          "name": "Betreuungsperson",
+          "description": "Name einer Betreuungsperson, wie in Sprout Track eingerichtet."
+        }
+      }
     }
   },
   "exceptions": {
@@ -569,5 +682,11 @@
       "message": "{field} passt nicht zu einer Mahlzeit der Art {feed_type}."
     },
     "unit_required": { "message": "Zur Menge die Einheit angeben (zum Beispiel ML oder OZ)." }
+  },
+  "issues": {
+    "no_dose_min_time": {
+      "title": "{title}: keine Abstände zwischen Dosen von Sprout Track",
+      "description": "Dein Sprout-Track-Server sendet den Mindestabstand zwischen den Dosen seiner Medikamente nicht, daher fehlen die Entitäten *… nächste Gabe* und *… erlaubt*; *… zuletzt gegeben* funktioniert. Veröffentlichte Versionen von Sprout Track senden ihn noch nicht. Sobald eine Version installiert ist, die ihn sendet, verschwindet dieser Hinweis von selbst."
+    }
   }
 }

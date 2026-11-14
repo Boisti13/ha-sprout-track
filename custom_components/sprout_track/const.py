@@ -24,6 +24,8 @@ MEASUREMENT_INTERVAL = timedelta(minutes=15)
 # deletions); the list of medicines with the measurements too.
 DOSE_KINDS = ("medicine", "supplement")
 DOSE_HISTORY = timedelta(days=30)
+# Released Sprout Track doesn't send minimum gaps between doses yet
+DOSE_GAP_ISSUE_URL = "https://github.com/Oak-and-Sprout/sprout-track/issues/298"
 DOSE_LIMIT = 50  # the API's maximum
 # A full page of doses means older ones were cut off; those are kept from
 # earlier fetches (and saved across restarts) instead of being forgotten.
@@ -37,5 +39,18 @@ FEED_LIMIT = 50
 # answer (an empty list during a server update, a medicine switched off for
 # a day) doesn't throw away entity IDs, names and history.
 REMOVE_AFTER = timedelta(hours=24)
+
+# Attribute values Sprout Track sends as fixed words (WET, NIGHT_SLEEP,
+# Breast Milk ...): shown as lowercase options (wet, night_sleep,
+# breast_milk), translated in the UI. Anything else (a custom bath type)
+# stays as Sprout Track sent it.
+ATTRIBUTE_VALUES = {
+    "feed_type": ("BREAST", "BOTTLE", "SOLIDS"),
+    "bottle_type": ("Formula", "Breast Milk", "Formula/Breast", "Milk", "Other"),
+    "diaper_type": ("WET", "DIRTY", "BOTH", "DRY"),
+    "sleep_type": ("NAP", "NIGHT_SLEEP"),
+    "bath_type": ("Full Bath", "Sponge Bath", "Wipe Down"),
+    "side": ("LEFT", "RIGHT"),
+}
 
 MANUFACTURER = "Sprout Track"

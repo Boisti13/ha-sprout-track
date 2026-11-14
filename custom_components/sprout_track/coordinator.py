@@ -5,13 +5,14 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+import inspect
 import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, issue_registry as ir
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -27,6 +28,7 @@ from .const import (
     CONF_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    DOSE_GAP_ISSUE_URL,
     DOSE_HISTORY,
     DOSE_KINDS,
     DOSE_LIMIT,
@@ -41,6 +43,9 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 type SproutTrackConfigEntry = ConfigEntry[SproutTrackCoordinator]
+
+# UpdateFailed takes retry_after only in newer Home Assistant versions
+_UPDATE_FAILED_RETRY_AFTER = "retry_after" in inspect.signature(UpdateFailed.__init__).parameters
 
 
 def parse_dose_gap(value: Any) -> timedelta | None:
@@ -103,6 +108,24 @@ class BabyData:
             return doses
         folded = name.casefold()
         return [d for d in doses if dose_name(d, kind).casefold() == folded]
+
+    def last_dose(self, kind: str, item_id: str) -> dict[str, Any] | None:
+        """Return the latest dose of one medicine (or supplement), if any."""
+        item = self.item(kind, item_id)
+        if item is None:
+            return None
+        doses = self.doses_of(kind, str(item.get("name") or ""))
+        return doses[0] if doses else None
+
+    def next_dose(self, kind: str, dose: dict[str, Any]) -> datetime | None:
+        """Return when the next dose of a dose's medicine is allowed, if it has a gap."""
+        name = dose_name(dose, kind).casefold()
+        item = next(
+            (i for i in self.items(kind) if str(i.get("name", "")).casefold() == name), None
+        )
+        gap = parse_dose_gap(item.get("doseMinTime")) if item else None
+        given = dt_util.parse_datetime(str(dose.get("time")))
+        return given + gap if gap and given else None
 
     def fed_since(self, since: datetime) -> float:
         """Return how much was fed since a time, in millilitres.
@@ -244,6 +267,7 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
                 self._measurements = dict(zip(ids, results[: len(ids)], strict=True))
                 self._references = dict(zip(ids, results[len(ids) :], strict=True))
                 self._measurements_at = now
+                self._check_dose_gap_support()
 
             await self._update_doses(ids, statuses, now, refresh=slow_due)
             await self._update_feeds(ids, statuses, now, refresh=slow_due)
@@ -251,8 +275,13 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
             raise ConfigEntryAuthFailed(err.message) from err
         except SproutTrackRateLimitError as err:
             # Wait as long as the server asks before the next update (Home
-            # Assistant then returns to the normal interval)
-            raise UpdateFailed(f"{err.code}: {err.message}", retry_after=err.retry_after) from err
+            # Assistant then returns to the normal interval); older versions
+            # of Home Assistant can't, and just try again at the next one
+            if _UPDATE_FAILED_RETRY_AFTER:
+                raise UpdateFailed(
+                    f"{err.code}: {err.message}", retry_after=err.retry_after
+                ) from err
+            raise UpdateFailed(f"{err.code}: {err.message}") from err
         except SproutTrackApiError as err:
             if err.code == "INSUFFICIENT_SCOPE":
                 raise ConfigEntryAuthFailed(err.message) from err
@@ -260,7 +289,7 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         except SproutTrackError as err:
             raise UpdateFailed(str(err)) from err
 
-        return {
+        data = {
             baby_id: BabyData(
                 info=baby,
                 status=status,
@@ -271,6 +300,20 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
             )
             for baby_id, baby, status in zip(ids, babies, statuses, strict=True)
         }
+        self._sync_device_names(data)
+        return data
+
+    def _sync_device_names(self, data: dict[str, BabyData]) -> None:
+        """Rename a baby's device when the baby is renamed in Sprout Track.
+
+        A name given in Home Assistant (name_by_user) still wins; entity IDs
+        stay as they are.
+        """
+        registry = dr.async_get(self.hass)
+        for baby_id, baby in data.items():
+            device = registry.async_get_device(identifiers={(DOMAIN, baby_id)})
+            if device is not None and device.name != baby.name:
+                registry.async_update_device(device.id, name=baby.name)
 
     async def _update_doses(
         self,
@@ -343,6 +386,35 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         for baby_id in [baby_id for baby_id in self._feeds if baby_id not in ids]:
             del self._feeds[baby_id]
             self._feed_marks.pop(baby_id, None)
+
+    def _check_dose_gap_support(self) -> None:
+        """Explain in Repairs why *next dose* is missing, when the server can't send it.
+
+        Sprout Track's released hooks API leaves out each medicine's minimum
+        time between doses (Oak-and-Sprout/sprout-track#298); a server that
+        sends it has the field on every medicine, empty or not.
+        """
+        items = [
+            item
+            for reference in self._references.values()
+            for kind in DOSE_KINDS
+            for item in reference.get(f"{kind}s") or []
+            if isinstance(item, dict)
+        ]
+        issue_id = f"no_dose_min_time_{self.config_entry.entry_id}"
+        if items and not any("doseMinTime" in item for item in items):
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                issue_id,
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                learn_more_url=DOSE_GAP_ISSUE_URL,
+                translation_key="no_dose_min_time",
+                translation_placeholders={"title": self.config_entry.title},
+            )
+        else:
+            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
 
     def invalidate_measurements(self) -> None:
         """Fetch the measurements again on the next update."""
