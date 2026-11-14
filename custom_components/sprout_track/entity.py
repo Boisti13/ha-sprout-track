@@ -55,7 +55,8 @@ def add_entities_per_baby(
     @callback
     def _check() -> None:
         current = set(coordinator.data)
-        known.intersection_update(current)
+        # A baby that is only missing for now keeps its entities (unavailable)
+        known.intersection_update(current | set(coordinator.missing_since))
         new = current - known
         if not new:
             return

@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import SproutTrackConfigEntry, SproutTrackCoordinator
 from .entity import SproutTrackEntity, add_entities_per_baby
-from .services import async_log_activity, async_start_sleep
+from .services import async_log_activity, async_start_sleep, is_sleep_start
 
 # One press, one request; let presses queue instead of racing each other.
 PARALLEL_UPDATES = 1
@@ -56,6 +56,27 @@ BUTTONS: tuple[SproutTrackButtonDescription, ...] = (
         translation_key="end_sleep",
         payload={"type": "sleep", "action": "end"},
     ),
+    # The breastfeeding timer, shared with the app (one session at a time)
+    SproutTrackButtonDescription(
+        key="start_breastfeeding_left",
+        translation_key="start_breastfeeding_left",
+        payload={"type": "feed", "feedType": "BREAST", "action": "start", "side": "LEFT"},
+    ),
+    SproutTrackButtonDescription(
+        key="start_breastfeeding_right",
+        translation_key="start_breastfeeding_right",
+        payload={"type": "feed", "feedType": "BREAST", "action": "start", "side": "RIGHT"},
+    ),
+    SproutTrackButtonDescription(
+        key="switch_breastfeeding_side",
+        translation_key="switch_breastfeeding_side",
+        payload={"type": "feed", "feedType": "BREAST", "action": "switch"},
+    ),
+    SproutTrackButtonDescription(
+        key="end_breastfeeding",
+        translation_key="end_breastfeeding",
+        payload={"type": "feed", "feedType": "BREAST", "action": "end"},
+    ),
 )
 
 
@@ -90,7 +111,7 @@ class SproutTrackButton(SproutTrackEntity, ButtonEntity):
     async def async_press(self) -> None:
         """Log the activity."""
         payload = dict(self.entity_description.payload)
-        if payload.get("action") == "start":
+        if is_sleep_start(payload):
             payload.pop("type")
             payload.pop("action")
             await async_start_sleep(self.coordinator, self.baby_id, payload)

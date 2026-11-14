@@ -23,13 +23,20 @@ owner's setup.
   `coordinator.py` polls `/babies`, each baby's `/status` every interval,
   `/measurements/latest` and `/reference` every 15 min, and the medicine
   and supplement doses (`/activities?type=…`, 30 days) when the status
-  shows a new one or with the 15-min fetch, into one `BabyData` per baby;
+  shows a new one or with the 15-min fetch, into one `BabyData` per baby
+  (a full page of 50 doses is merged with the older doses known from
+  before, saved in `.storage/sprout_track.<entry>.doses`);
   `entity.py` has the base entity and `add_entities_per_baby()` (babies
   come and go without a reload); the per-medicine sensors are added and
   removed by their own listener in `sensor.py` (`_add_dose_sensors`); `sensor.py`, `binary_sensor.py`,
   `button.py` are description tables; `services.py` holds the actions and
   the two helpers the buttons share (`async_log_activity`,
   `async_start_sleep`).
+- **Nothing is removed at once.** A baby or medicine missing from an
+  answer goes unavailable; device and entities are removed after
+  `REMOVE_AFTER` (24 h, `coordinator.missing_since` / `gone_since` in
+  `sensor.py`). Code that runs while an entity is unavailable (unit,
+  device class) must not assume its baby is in `coordinator.data`.
 - **A new entity or action** needs: the description or handler, texts in
   **both** `translations/en.json` and `de.json`, an icon in `icons.json`,
   for actions the fields in `services.yaml`, a test, a README table row

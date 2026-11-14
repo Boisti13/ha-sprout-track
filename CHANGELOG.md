@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.4.0 — 2026-11-14
+
+### Added
+
+- **`sprout_track.log_feed`**: logs a bottle (amount with unit, bottle
+  content) or a finished breastfeed (side, duration). A bottle amount
+  needs its unit; without one Sprout Track would store a bare number that
+  *Fed today* can't count.
+- **`sprout_track.breastfeeding`**: starts, switches, pauses, resumes or
+  ends the breastfeeding timer, the same one the Sprout Track app shows.
+- **Buttons** *Start breastfeeding left / right*, *Switch breastfeeding
+  side* and *End breastfeeding* for every baby.
+
+### Fixed
+
+- **Devices and entities vanished after one odd answer.** A baby missing
+  from Sprout Track's list (or a medicine missing from its medicines) was
+  removed at the next update, along with its entity IDs, names and
+  settings; an empty list while the server was being updated would have
+  removed every baby. Now it goes unavailable and is removed only after
+  24 hours; back within the day, the same entities carry on. A missing
+  baby's device can still be deleted by hand at once.
+- **A rarely given medicine could lose its *last given*.** The API
+  returns at most 50 doses of a kind; when a month held more (a sick
+  week with several doses a day), older doses of other medicines fell out
+  of the list and their sensor showed *unknown*. Doses older than a full
+  page are now kept from earlier updates and saved across restarts
+  (`.storage/sprout_track.<entry>.doses`, deleted with the entry).
+- Measurement sensors raised an error while their baby was missing.
+- **Too many requests:** when Sprout Track answers HTTP 429, the next
+  update now waits as long as its `Retry-After` says instead of trying
+  again after the normal interval.
+
 ## v0.3.0 — 2026-11-13
 
 ### Added

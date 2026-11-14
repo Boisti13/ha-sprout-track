@@ -225,6 +225,110 @@ async def test_measurement_refreshes_measurements(
     assert sum("/measurements" in str(c[1]) for c in aioclient_mock.mock_calls) == before + 1
 
 
+async def test_log_feed(
+    hass: HomeAssistant, one_baby: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Bottle feeds and finished breastfeeds reach the API under its own names."""
+    await _call(
+        hass,
+        "log_feed",
+        {"amount": 120.0, "unit": "ML", "bottle_type": "Breast_Milk", "notes": "fussy"},
+    )
+    await _call(
+        hass,
+        "log_feed",
+        {"feed_type": "breast", "side": "left", "duration": 15, "caretaker": "Mum"},
+    )
+    assert _posts(aioclient_mock) == [
+        (
+            BABY_1,
+            {
+                "type": "feed",
+                "feedType": "BOTTLE",
+                "amount": 120,
+                "bottleType": "Breast Milk",
+                "unitAbbr": "ML",
+                "notes": "fussy",
+            },
+        ),
+        (
+            BABY_1,
+            {
+                "type": "feed",
+                "feedType": "BREAST",
+                "caretakerName": "Mum",
+                "side": "LEFT",
+                "duration": 15,
+            },
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("data", "field"),
+    [
+        ({"side": "left"}, "side"),
+        ({"duration": 10}, "duration"),
+        ({"feed_type": "breast", "bottle_type": "formula"}, "bottle_type"),
+    ],
+)
+async def test_log_feed_wrong_fields(
+    hass: HomeAssistant,
+    one_baby: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    data: dict[str, Any],
+    field: str,
+) -> None:
+    """A bottle has no side, a breastfeed no bottle content: refused before sending."""
+    with pytest.raises(ServiceValidationError) as err:
+        await _call(hass, "log_feed", data)
+    assert err.value.translation_key == "feed_field_mismatch"
+    assert err.value.translation_placeholders["field"] == field
+    assert _posts(aioclient_mock) == []
+
+
+async def test_log_feed_amount_needs_unit(
+    hass: HomeAssistant, one_baby: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """An amount without a unit would be stored unitless: refused."""
+    with pytest.raises(ServiceValidationError) as err:
+        await _call(hass, "log_feed", {"amount": 90})
+    assert err.value.translation_key == "unit_required"
+    assert _posts(aioclient_mock) == []
+
+
+async def test_breastfeeding_timer(
+    hass: HomeAssistant, one_baby: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """The timer actions go to the API; starting needs a side."""
+    with pytest.raises(ServiceValidationError) as err:
+        await _call(hass, "breastfeeding", {"action": "start"})
+    assert err.value.translation_key == "side_required"
+
+    await _call(hass, "breastfeeding", {"action": "start", "side": "right", "caretaker": "Mum"})
+    await _call(hass, "breastfeeding", {"action": "pause"})
+    await _call(hass, "breastfeeding", {"action": "resume", "side": "left"})
+    await _call(hass, "breastfeeding", {"action": "end"})
+    feed = {"type": "feed", "feedType": "BREAST"}
+    assert _posts(aioclient_mock) == [
+        (BABY_1, {**feed, "action": "start", "side": "RIGHT", "caretakerName": "Mum"}),
+        (BABY_1, {**feed, "action": "pause"}),
+        (BABY_1, {**feed, "action": "resume", "side": "LEFT"}),
+        (BABY_1, {**feed, "action": "end"}),
+    ]
+
+    # A second start while one runs: the API's refusal is the caller's mistake
+    aioclient_mock.clear_requests()
+    aioclient_mock.post(
+        f"{API}/babies/{BABY_1}/activities",
+        status=409,
+        json=api_error("FEED_ALREADY_ACTIVE", "A feed session is already active"),
+    )
+    with pytest.raises(ServiceValidationError) as err:
+        await _call(hass, "breastfeeding", {"action": "start", "side": "left"})
+    assert err.value.translation_placeholders["code"] == "FEED_ALREADY_ACTIVE"
+
+
 async def test_errors(
     hass: HomeAssistant, one_baby: MockConfigEntry, aioclient_mock: AiohttpClientMocker
 ) -> None:
@@ -270,6 +374,16 @@ async def test_errors(
         ("start_nap", {"type": "sleep", "action": "start", "sleepType": "NAP"}),
         ("start_night_sleep", {"type": "sleep", "action": "start", "sleepType": "NIGHT_SLEEP"}),
         ("end_sleep", {"type": "sleep", "action": "end"}),
+        (
+            "start_breastfeeding_left",
+            {"type": "feed", "feedType": "BREAST", "action": "start", "side": "LEFT"},
+        ),
+        (
+            "start_breastfeeding_right",
+            {"type": "feed", "feedType": "BREAST", "action": "start", "side": "RIGHT"},
+        ),
+        ("switch_breastfeeding_side", {"type": "feed", "feedType": "BREAST", "action": "switch"}),
+        ("end_breastfeeding", {"type": "feed", "feedType": "BREAST", "action": "end"}),
     ],
 )
 async def test_buttons(

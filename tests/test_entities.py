@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
@@ -16,8 +17,8 @@ from pytest_homeassistant_custom_component.common import (
 )
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.sprout_track.const import DOMAIN
-from custom_components.sprout_track.coordinator import parse_dose_gap
+from custom_components.sprout_track.const import DOMAIN, DOSE_LIMIT
+from custom_components.sprout_track.coordinator import merge_doses, parse_dose_gap
 
 from .conftest import API, BABY_1, BABY_2, api_error, load, mock_api
 
@@ -47,9 +48,9 @@ async def test_devices(hass: HomeAssistant, loaded: MockConfigEntry) -> None:
     assert emma.manufacturer == "Sprout Track"
     assert emma.configuration_url == "http://192.168.1.50:3000"
     entities = er.async_entries_for_device(er.async_get(hass), emma.id)
-    # 25 sensors, 5 binary sensors, 6 buttons, *last given* for Paracetamol
+    # 25 sensors, 5 binary sensors, 10 buttons, *last given* for Paracetamol
     # and Vitamin D (no *next dose*: no minimum gap in the fixture)
-    assert len(entities) == 25 + 5 + 6 + 2
+    assert len(entities) == 25 + 5 + 10 + 2
     assert all(e.unique_id.startswith(f"{BABY_1}_") for e in entities)
 
 
@@ -196,9 +197,12 @@ async def test_measurements_polled_less_often(
 
 
 async def test_baby_added_and_removed(
-    hass: HomeAssistant, entry: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
-    """A new baby gets a device without a reload; a removed one loses it."""
+    """A new baby gets a device without a reload; one gone for a day loses it."""
     one = load("babies")
     one["data"]["babies"] = one["data"]["babies"][:1]
     mock_api(aioclient_mock, babies=one)
@@ -211,13 +215,105 @@ async def test_baby_added_and_removed(
     assert _state(hass, "sensor.mia_feeds_today") == "0"
     assert _device(hass, entry, BABY_2) is not None
 
+    # Missing from one answer: unavailable, but device and entities stay
     mock_api(aioclient_mock, babies=one)
+    await _poll(hass)
+    assert _device(hass, entry, BABY_2) is not None
+    assert _state(hass, "sensor.mia_feeds_today") == STATE_UNAVAILABLE
+    assert _state(hass, "sensor.emma_feeds_today") == "1"
+
+    # Back within the day: the same entities work again
+    mock_api(aioclient_mock)
+    await _poll(hass)
+    assert _state(hass, "sensor.mia_feeds_today") == "0"
+
+    # Gone for a day: device and entities are removed
+    mock_api(aioclient_mock, babies=one)
+    await _poll(hass)
+    freezer.tick(timedelta(hours=23))
+    await _poll(hass)
+    assert _device(hass, entry, BABY_2) is not None
+    freezer.tick(timedelta(hours=1))
     await _poll(hass)
     assert _device(hass, entry, BABY_2) is None
     assert hass.states.get("sensor.mia_feeds_today") is None
-    assert _state(hass, "sensor.emma_feeds_today") == "1"
+    assert er.async_get(hass).async_get("sensor.mia_feeds_today") is None
 
-    # ... and coming back works too
+    # ... and coming back after that works too
+    mock_api(aioclient_mock)
+    await _poll(hass)
+    assert _state(hass, "sensor.mia_feeds_today") == "0"
+
+
+async def test_empty_baby_list_keeps_devices(
+    hass: HomeAssistant, loaded: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """An empty answer (a server being updated) doesn't remove anything."""
+    mock_api(aioclient_mock, babies={"success": True, "data": {"babies": []}})
+    await _poll(hass)
+    assert _device(hass, loaded, BABY_1) is not None
+    assert _device(hass, loaded, BABY_2) is not None
+    assert _state(hass, "sensor.emma_last_feed") == STATE_UNAVAILABLE
+    assert _state(hass, "sensor.emma_paracetamol_last_given") == STATE_UNAVAILABLE
+
+    mock_api(aioclient_mock)
+    await _poll(hass)
+    assert _state(hass, "sensor.emma_last_feed") == "2026-11-12T13:38:21+00:00"
+    assert _state(hass, "sensor.emma_paracetamol_last_given") == "2026-11-12T13:38:21+00:00"
+
+
+async def test_baby_missing_after_restart(
+    hass: HomeAssistant,
+    loaded: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """A baby gone while Home Assistant was off is removed a day later too."""
+    assert await hass.config_entries.async_unload(loaded.entry_id)
+    one = load("babies")
+    one["data"]["babies"] = one["data"]["babies"][:1]
+    mock_api(aioclient_mock, babies=one)
+    assert await hass.config_entries.async_setup(loaded.entry_id)
+    await hass.async_block_till_done()
+    assert _device(hass, loaded, BABY_2) is not None
+
+    freezer.tick(timedelta(hours=24))
+    await _poll(hass)
+    assert _device(hass, loaded, BABY_2) is None
+
+
+async def test_device_deleted_by_hand(
+    hass: HomeAssistant,
+    loaded: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    hass_ws_client,
+) -> None:
+    """A missing baby's device can be deleted at once; a listed one's can't."""
+    assert await async_setup_component(hass, "config", {})
+    client = await hass_ws_client(hass)
+
+    async def remove(baby_id: str) -> bool:
+        device = _device(hass, loaded, baby_id)
+        await client.send_json_auto_id(
+            {
+                "type": "config/device_registry/remove_config_entry",
+                "config_entry_id": loaded.entry_id,
+                "device_id": device.id,
+            }
+        )
+        return (await client.receive_json())["success"]
+
+    assert not await remove(BABY_2)
+
+    one = load("babies")
+    one["data"]["babies"] = one["data"]["babies"][:1]
+    mock_api(aioclient_mock, babies=one)
+    await _poll(hass)
+    assert await remove(BABY_2)
+    await hass.async_block_till_done()
+    assert _device(hass, loaded, BABY_2) is None
+    assert loaded.runtime_data.missing_since == {}
+
     mock_api(aioclient_mock)
     await _poll(hass)
     assert _state(hass, "sensor.mia_feeds_today") == "0"
@@ -241,6 +337,26 @@ async def test_update_fails_and_recovers(
 
     mock_api(aioclient_mock)
     await _poll(hass)
+    assert _state(hass, "sensor.emma_feeds_today") == "1"
+
+
+async def test_rate_limit_waits(
+    hass: HomeAssistant, loaded: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """After HTTP 429 the next update waits as long as Retry-After says."""
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(
+        f"{API}/babies", status=429, json=api_error("RATE_LIMITED"), headers={"Retry-After": "300"}
+    )
+    await _poll(hass)
+    assert _state(hass, "sensor.emma_feeds_today") == STATE_UNAVAILABLE
+
+    mock_api(aioclient_mock)
+    await _poll(hass)  # one normal interval later: not asked yet
+    assert aioclient_mock.call_count == 0
+    assert _state(hass, "sensor.emma_feeds_today") == STATE_UNAVAILABLE
+
+    await _poll(hass, 300)
     assert _state(hass, "sensor.emma_feeds_today") == "1"
 
 
@@ -401,6 +517,10 @@ async def test_medicine_added_and_removed(
     mock_api(aioclient_mock, reference=reference)
     freezer.tick(timedelta(minutes=16))
     await _poll(hass)
+    # Kept for a day (unavailable), then removed
+    assert _state(hass, "sensor.emma_paracetamol_last_given") == STATE_UNAVAILABLE
+    freezer.tick(timedelta(hours=24))
+    await _poll(hass)
     assert registry.async_get("sensor.emma_paracetamol_last_given") is None
     assert hass.states.get("sensor.emma_paracetamol_last_given") is None
     assert _state(hass, "sensor.emma_vitamin_d_last_given") != STATE_UNAVAILABLE
@@ -413,9 +533,12 @@ async def test_medicine_added_and_removed(
 
 
 async def test_medicine_removed_while_reloading(
-    hass: HomeAssistant, loaded: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+    hass: HomeAssistant,
+    loaded: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
-    """A medicine that went away during a reload loses its sensor too."""
+    """A medicine that went away during a reload loses its sensor a day later."""
     registry = er.async_get(hass)
     assert registry.async_get("sensor.emma_paracetamol_last_given") is not None
     assert await hass.config_entries.async_unload(loaded.entry_id)
@@ -425,6 +548,10 @@ async def test_medicine_removed_while_reloading(
     mock_api(aioclient_mock, reference=reference)
     assert await hass.config_entries.async_setup(loaded.entry_id)
     await hass.async_block_till_done()
+    assert registry.async_get("sensor.emma_paracetamol_last_given") is not None
+
+    freezer.tick(timedelta(hours=24))
+    await _poll(hass)
     assert registry.async_get("sensor.emma_paracetamol_last_given") is None
     assert registry.async_get("sensor.mia_paracetamol_last_given") is None
     assert _state(hass, "sensor.emma_vitamin_d_last_given") == "2026-11-12T13:38:21+00:00"
@@ -484,3 +611,84 @@ async def test_feeds_fetched_on_change(
     mock_api(aioclient_mock, status_1=status)
     await _poll(hass)
     assert count() == 1  # only Emma's (the mock was reset)
+
+
+def _dose(dose_id: str, name: str, time: str) -> dict:
+    return {
+        "activityType": "medicine",
+        "id": dose_id,
+        "time": time,
+        "details": {"medicineName": name, "doseAmount": 1, "unitAbbr": "ML", "notes": None},
+        "caretakerName": None,
+    }
+
+
+def _page(doses: list[dict]) -> dict:
+    return {
+        "success": True,
+        "data": {"activities": doses, "count": len(doses), "hasMore": False},
+    }
+
+
+async def test_rare_medicine_kept_when_page_is_full(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """A medicine given often doesn't push a rarely given one out of view.
+
+    The API returns at most 50 doses per kind, newest first. A full page was
+    cut off; doses older than it are kept from before, also across a reload.
+    """
+    freezer.move_to("2026-11-12T18:00:00+00:00")
+    reference = load("reference")
+    reference["data"]["medicines"].append(
+        {"id": "med-0003", "name": "Ibuprofen", "typicalDoseSize": 2, "unitAbbr": "ML"}
+    )
+    ibuprofen = _dose("ibu-1", "Ibuprofen", "2026-11-02T08:00:00.000Z")
+    paracetamol = [
+        _dose(f"para-{i}", "Paracetamol", (dt_util.utcnow() - timedelta(hours=5 + i)).isoformat())
+        for i in range(DOSE_LIMIT)
+    ]
+
+    def serve(doses: list[dict]) -> None:
+        mock_api(aioclient_mock, reference=reference, activities={"medicine": _page(doses)})
+
+    serve([paracetamol[0], ibuprofen])
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert _state(hass, "sensor.emma_ibuprofen_last_given") == "2026-11-02T08:00:00+00:00"
+
+    # 50 newer Paracetamol doses: the page is full, Ibuprofen is kept
+    serve(paracetamol)
+    freezer.tick(timedelta(minutes=16))
+    await _poll(hass)
+    assert _state(hass, "sensor.emma_ibuprofen_last_given") == "2026-11-02T08:00:00+00:00"
+    assert _state(hass, "sensor.emma_paracetamol_last_given") == paracetamol[0]["time"]
+
+    # ... also after a reload (saved on unload, loaded on setup)
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert _state(hass, "sensor.emma_ibuprofen_last_given") == "2026-11-02T08:00:00+00:00"
+
+    # A page that isn't full is the whole truth: the dose was deleted
+    serve(paracetamol[:3])
+    freezer.tick(timedelta(minutes=16))
+    await _poll(hass)
+    assert _state(hass, "sensor.emma_ibuprofen_last_given") == STATE_UNKNOWN
+
+
+def test_merge_doses() -> None:
+    """Older doses fill in a full page, within the history and without doubles."""
+    since = dt_util.parse_datetime("2026-11-01T00:00:00Z")
+    fresh = [_dose(f"n{i}", "A", f"2026-11-10T{i:02d}:00:00Z") for i in range(3)]
+    cached = [
+        _dose("n0", "A", "2026-11-10T00:00:00Z"),  # also in the fresh page
+        _dose("old", "B", "2026-11-05T00:00:00Z"),  # older than the page: kept
+        _dose("gone", "B", "2026-11-10T01:30:00Z"),  # within the page: deleted
+        _dose("ancient", "B", "2026-10-20T00:00:00Z"),  # beyond the history
+    ]
+    assert [d["id"] for d in merge_doses(cached, fresh, since, 3)] == ["n0", "n1", "n2", "old"]
+    assert merge_doses(cached, fresh, since, 4) == fresh

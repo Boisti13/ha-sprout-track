@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from functools import partial
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntryState
@@ -30,6 +31,8 @@ SERVICE_LOG_SLEEP = "log_sleep"
 SERVICE_LOG_MEDICINE = "log_medicine"
 SERVICE_LOG_SUPPLEMENT = "log_supplement"
 SERVICE_LOG_ACTIVITY = "log_activity"
+SERVICE_LOG_FEED = "log_feed"
+SERVICE_BREASTFEEDING = "breastfeeding"
 
 ATTR_TIME = "time"
 ATTR_CARETAKER = "caretaker"
@@ -48,12 +51,30 @@ ATTR_SUPPLEMENT = "supplement"
 ATTR_AMOUNT = "amount"
 ATTR_UNIT = "unit"
 ATTR_DATA = "data"
+ATTR_FEED_TYPE = "feed_type"
+ATTR_BOTTLE_TYPE = "bottle_type"
+ATTR_SIDE = "side"
+ATTR_ACTION = "action"
 
 DIAPER_TYPES = ["wet", "dirty", "both", "dry"]
 DIAPER_CONDITIONS = ["normal", "loose", "firm", "other"]
 DIAPER_COLORS = ["yellow", "brown", "green", "black", "red", "other"]
 SLEEP_TYPES = ["nap", "night_sleep"]
 SLEEP_QUALITIES = ["poor", "fair", "good", "excellent"]
+FEED_TYPES = ["bottle", "breast"]
+# Action values and how Sprout Track spells them
+BOTTLE_TYPES = {
+    "formula": "Formula",
+    "breast_milk": "Breast Milk",
+    "formula_breast": "Formula/Breast",
+    "milk": "Milk",
+    "other": "Other",
+}
+SIDES = ["left", "right"]
+BREASTFEEDING_ACTIONS = ["start", "switch", "pause", "resume", "end"]
+# Fields that only fit one kind of feed
+_BOTTLE_ONLY = (ATTR_BOTTLE_TYPE,)
+_BREAST_ONLY = (ATTR_SIDE, ATTR_DURATION)
 
 _COMMON = {
     vol.Optional(ATTR_DEVICE_ID): cv.string,
@@ -115,6 +136,28 @@ _DOSE = {
 
 LOG_MEDICINE_SCHEMA = vol.Schema({**_COMMON, vol.Required(ATTR_MEDICINE): cv.string, **_DOSE})
 LOG_SUPPLEMENT_SCHEMA = vol.Schema({**_COMMON, vol.Required(ATTR_SUPPLEMENT): cv.string, **_DOSE})
+
+LOG_FEED_SCHEMA = vol.Schema(
+    {
+        **_COMMON,
+        vol.Optional(ATTR_FEED_TYPE, default="bottle"): _lower_in(FEED_TYPES),
+        vol.Optional(ATTR_AMOUNT): vol.All(vol.Coerce(float), vol.Range(min=0)),
+        vol.Optional(ATTR_UNIT): cv.string,
+        vol.Optional(ATTR_BOTTLE_TYPE): _lower_in(list(BOTTLE_TYPES)),
+        vol.Optional(ATTR_SIDE): _lower_in(SIDES),
+        vol.Optional(ATTR_DURATION): vol.All(vol.Coerce(int), vol.Range(min=1)),
+        vol.Optional(ATTR_NOTES): cv.string,
+    }
+)
+
+BREASTFEEDING_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_DEVICE_ID): cv.string,
+        vol.Required(ATTR_ACTION): _lower_in(BREASTFEEDING_ACTIONS),
+        vol.Optional(ATTR_SIDE): _lower_in(SIDES),
+        vol.Optional(ATTR_CARETAKER): cv.string,
+    }
+)
 
 LOG_ACTIVITY_SCHEMA = vol.Schema(
     {
@@ -223,6 +266,16 @@ async def async_start_sleep(
     )
 
 
+def _whole(amount: float) -> float | int:
+    """Send 2.0 as 2, so whole amounts look the same as typed in the app."""
+    return int(amount) if float(amount).is_integer() else amount
+
+
+def is_sleep_start(payload: dict[str, Any]) -> bool:
+    """Return whether a payload starts a sleep (checked for a running one first)."""
+    return payload.get("type") == "sleep" and payload.get("action") == "start"
+
+
 def _common_payload(call: ServiceCall) -> dict[str, Any]:
     payload: dict[str, Any] = {}
     time: datetime | None = call.data.get(ATTR_TIME)
@@ -241,6 +294,47 @@ def _copy(
     for attr, api_key in fields.items():
         if (value := call.data.get(attr)) is not None:
             payload[api_key] = value.upper() if upper else value
+
+
+async def _log_feed(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
+    """Log a bottle feed or a finished breastfeed."""
+    coordinator, baby_id = _resolve_baby(hass, call.data.get(ATTR_DEVICE_ID))
+    feed_type: str = call.data[ATTR_FEED_TYPE]
+    wrong = _BREAST_ONLY if feed_type == "bottle" else _BOTTLE_ONLY
+    if field := next((f for f in wrong if f in call.data), None):
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="feed_field_mismatch",
+            translation_placeholders={"field": field, "feed_type": feed_type},
+        )
+    if ATTR_AMOUNT in call.data and ATTR_UNIT not in call.data:
+        # Sprout Track would store the amount without a unit, and nothing
+        # (Fed today included) could tell millilitres from ounces
+        raise ServiceValidationError(translation_domain=DOMAIN, translation_key="unit_required")
+    payload: dict[str, Any] = {
+        "type": "feed",
+        "feedType": feed_type.upper(),
+        **_common_payload(call),
+    }
+    if (amount := call.data.get(ATTR_AMOUNT)) is not None:
+        payload["amount"] = _whole(amount)
+    if bottle_type := call.data.get(ATTR_BOTTLE_TYPE):
+        payload["bottleType"] = BOTTLE_TYPES[bottle_type]
+    _copy(call, payload, {ATTR_SIDE: "side"}, upper=True)
+    _copy(call, payload, {ATTR_UNIT: "unitAbbr", ATTR_DURATION: "duration", ATTR_NOTES: "notes"})
+    return await async_log_activity(coordinator, baby_id, payload)
+
+
+async def _breastfeeding(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
+    """Control the breastfeeding timer shared with the app."""
+    coordinator, baby_id = _resolve_baby(hass, call.data.get(ATTR_DEVICE_ID))
+    action: str = call.data[ATTR_ACTION]
+    if action == "start" and ATTR_SIDE not in call.data:
+        raise ServiceValidationError(translation_domain=DOMAIN, translation_key="side_required")
+    payload: dict[str, Any] = {"type": "feed", "feedType": "BREAST", "action": action}
+    _copy(call, payload, {ATTR_SIDE: "side"}, upper=True)
+    _copy(call, payload, {ATTR_CARETAKER: "caretakerName"})
+    return await async_log_activity(coordinator, baby_id, payload)
 
 
 @callback
@@ -346,8 +440,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
         payload = {
             "type": kind,
             f"{kind}Name": name,
-            # 2.0 -> 2, so whole doses look the same as when typed in the app
-            "amount": int(amount) if float(amount).is_integer() else amount,
+            "amount": _whole(amount),
             **_common_payload(call),
         }
         _copy(call, payload, {ATTR_UNIT: "unitAbbr", ATTR_NOTES: "notes"})
@@ -362,7 +455,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
     async def log_activity(call: ServiceCall) -> ServiceResponse:
         coordinator, baby_id = _resolve_baby(hass, call.data.get(ATTR_DEVICE_ID))
         payload = dict(call.data[ATTR_DATA])
-        if payload.get("type") == "sleep" and payload.get("action") == "start":
+        if is_sleep_start(payload):
             payload.pop("type")
             payload.pop("action")
             return await async_start_sleep(coordinator, baby_id, payload)
@@ -375,6 +468,8 @@ def async_setup_services(hass: HomeAssistant) -> None:
         (SERVICE_LOG_SLEEP, log_sleep, LOG_SLEEP_SCHEMA),
         (SERVICE_LOG_MEDICINE, log_medicine, LOG_MEDICINE_SCHEMA),
         (SERVICE_LOG_SUPPLEMENT, log_supplement, LOG_SUPPLEMENT_SCHEMA),
+        (SERVICE_LOG_FEED, partial(_log_feed, hass), LOG_FEED_SCHEMA),
+        (SERVICE_BREASTFEEDING, partial(_breastfeeding, hass), BREASTFEEDING_SCHEMA),
         (SERVICE_LOG_ACTIVITY, log_activity, LOG_ACTIVITY_SCHEMA),
     ):
         hass.services.async_register(

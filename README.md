@@ -34,9 +34,11 @@ project and not part of Sprout Track.
 - **Warnings as binary sensors**: feed overdue and diaper overdue, using
   the warning times set per baby in Sprout Track.
 - **Buttons** for the usual one-tap entries: diapers, start nap, start
-  night sleep, end sleep.
-- **Actions** for diapers, sleep, medicine and supplements with all their
-  details, plus one that passes any activity to the API.
+  night sleep, end sleep, and the breastfeeding timer (start left or
+  right, switch side, end).
+- **Actions** for feeds, the breastfeeding timer, diapers, sleep, medicine
+  and supplements with all their details, plus one that passes any
+  activity to the API.
 - **Careful with sleep**: a second sleep is never started while one runs.
 - **Local**: talks only to your Sprout Track server.
 - English and German.
@@ -104,7 +106,8 @@ Entity IDs start with the baby's first name, e.g. `sensor.emma_last_feed`.
 | *Name* next dose | time the next dose is allowed (in the past once it is) | same |
 
 *Next dose* exists only for medicines with a minimum time between doses
-(see *Good to know*). A medicine deleted in Sprout Track loses its sensors.
+(see *Good to know*). A medicine deleted in Sprout Track goes unavailable
+and loses its sensors a day later.
 
 *Medicines today* and *Supplements today* carry two lists for dashboards
 and templates, newest first, times in local time:
@@ -134,6 +137,11 @@ is one feed.
 | Log wet diaper / Log dirty diaper / Log wet and dirty diaper | a diaper change, now |
 | Start nap / Start night sleep | the start of a sleep (refused while asleep) |
 | End sleep | the end of the running sleep |
+| Start breastfeeding left / right | starts the breastfeeding timer on that side (refused while one runs) |
+| Switch breastfeeding side / End breastfeeding | switches sides of, or ends, the running timer |
+
+The breastfeeding timer is the one in the Sprout Track app: started here,
+it runs there too, and the other way round. Ending it logs the feed.
 
 Entities you don't need can be disabled in Home Assistant as usual.
 
@@ -146,6 +154,8 @@ returns what Sprout Track created if you ask for the response.
 
 | Action | Fields |
 |---|---|
+| `sprout_track.log_feed` | `feed_type` (bottle, breast; default bottle); for a bottle `amount` with `unit` (as set up in Sprout Track, e.g. ML or OZ) and `bottle_type` (formula, breast_milk, formula_breast, milk, other); for a breastfeed `side` (left, right) and `duration` (minutes); `notes` |
+| `sprout_track.breastfeeding` | `action` (start, switch, pause, resume, end), `side` (needed to start; optional to resume on the other side). No `time`: the timer runs from now |
 | `sprout_track.log_diaper` | `diaper_type` (wet, dirty, both, dry), `condition`, `color`, `blowout`, `cream_applied`, `notes` |
 | `sprout_track.start_sleep` | `sleep_type` (nap, night_sleep; default nap), `location`, `notes` |
 | `sprout_track.end_sleep` | `sleep_type` (to change it), `quality`, `notes` |
@@ -204,16 +214,30 @@ A nap in the car seat, and the vitamin drops with their usual dose:
     supplement: Vitamin D
 ```
 
-A bottle, through the pass-through action:
+A bottle of formula, and a finished breastfeed:
+
+```yaml
+- action: sprout_track.log_feed
+  data:
+    amount: 120
+    unit: ML
+    bottle_type: formula
+
+- action: sprout_track.log_feed
+  data:
+    feed_type: breast
+    side: left
+    duration: 15
+```
+
+Anything else, through the pass-through action (here a bath):
 
 ```yaml
 - action: sprout_track.log_activity
   data:
     data:
-      type: feed
-      feedType: formula
-      amount: 120
-      unitAbbr: ML
+      type: bath
+      soapUsed: true
 ```
 
 Tell the phone when a feed is overdue:
@@ -249,8 +273,17 @@ automation:
   minimum time between doses (`doseMinTime`). Released versions don't yet
   ([Oak-and-Sprout/sprout-track#298](https://github.com/Oak-and-Sprout/sprout-track/issues/298));
   until then only *last given* appears.
-- **Removing a baby:** a baby made inactive in Sprout Track loses its
-  device in Home Assistant at the next update.
+- **Removing a baby:** a baby Sprout Track no longer lists (made
+  inactive, deleted) goes unavailable and loses its device in Home
+  Assistant after 24 hours. The wait keeps entity IDs, names and history
+  safe from a single odd answer, such as an empty list while the server is
+  being updated; a baby back within the day carries on as before. To
+  remove it at once, delete the device by hand (*Delete* on its device
+  page, offered while the baby is missing).
+- **Many doses:** Sprout Track returns at most 50 doses of a kind at a
+  time. When a month holds more, the older doses are kept from earlier
+  updates (and saved across restarts), so a medicine given rarely keeps
+  its *last given* while another is given often.
 - **Troubleshooting:** *Download diagnostics* on the integration gives a
   file without names, dates, IDs or the key. Debug log:
   `custom_components.sprout_track: debug` under `logger:`.
