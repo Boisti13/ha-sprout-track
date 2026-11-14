@@ -20,14 +20,13 @@ from homeassistant.const import (
     UnitOfTime,
     UnitOfVolume,
 )
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.util import dt as dt_util
 
-from .const import DOSE_KINDS, REMOVE_AFTER
+from .const import DOSE_KINDS
 from .coordinator import (
     BabyData,
     SproutTrackConfigEntry,
@@ -35,25 +34,23 @@ from .coordinator import (
     dose_name,
     parse_dose_gap,
 )
-from .entity import SproutTrackEntity, add_entities_per_baby
+from .entity import (
+    SproutTrackDoseEntity,
+    SproutTrackEntity,
+    add_dose_entities,
+    add_entities_per_baby,
+)
 
 # The coordinator polls; entities never fetch on their own.
 PARALLEL_UPDATES = 0
 
 SLEEP_STATES = ["awake", "nap", "night_sleep", "asleep"]
 
-DOSE_SUFFIXES = ("_last_given", "_next_dose")
-
-
-def _dose_unique_id(baby_id: str, kind: str, item_id: str, which: str) -> str:
-    return f"{baby_id}_{kind}_{item_id}_{which}"
-
+DOSE_WHICHES = ("last_given", "next_dose")
 
 # Sensors made per medicine and supplement (not in SENSORS: they come and go
 # with the medicines set up in Sprout Track).
-DOSE_TRANSLATION_KEYS = tuple(
-    f"{kind}_{which}" for kind in DOSE_KINDS for which in ("last_given", "next_dose")
-)
+DOSE_TRANSLATION_KEYS = tuple(f"{kind}_{which}" for kind in DOSE_KINDS for which in DOSE_WHICHES)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -97,15 +94,6 @@ def _diapers(*types: str) -> Callable[[BabyData], StateType]:
     return count
 
 
-def _next_dose(baby: BabyData, kind: str, dose: dict[str, Any]) -> datetime | None:
-    """Return when the next dose of a dose's medicine is allowed, if it has a gap."""
-    name = dose_name(dose, kind).casefold()
-    item = next((i for i in baby.items(kind) if str(i.get("name", "")).casefold() == name), None)
-    gap = parse_dose_gap(item.get("doseMinTime")) if item else None
-    given = _timestamp(dose.get("time"))
-    return given + gap if gap and given else None
-
-
 def _iso(value: datetime | None) -> str | None:
     return dt_util.as_local(value).isoformat() if value else None
 
@@ -143,7 +131,7 @@ def _dose_lists(kind: str) -> Callable[[BabyData], dict[str, Any]]:
             latest.append(
                 {
                     **_dose_entry(kind, dose),
-                    "next_dose": _iso(_next_dose(baby, kind, dose)),
+                    "next_dose": _iso(baby.next_dose(kind, dose)),
                 }
             )
         return {"doses": today, "latest": latest}
@@ -417,90 +405,20 @@ async def async_setup_entry(
         ]
 
     add_entities_per_baby(entry, async_add_entities, factory)
-    _add_dose_sensors(hass, entry, async_add_entities)
-
-
-def _add_dose_sensors(
-    hass: HomeAssistant,
-    entry: SproutTrackConfigEntry,
-    async_add_entities: AddConfigEntryEntitiesCallback,
-) -> None:
-    """Keep one sensor per medicine and supplement, as they come and go.
-
-    Every one gets *last given*; those with a minimum time between doses
-    also get *next dose*.
-    """
-    coordinator = entry.runtime_data
-    known: dict[tuple[str, str, str, str], SproutTrackDoseSensor] = {}
-    # Unique IDs of dose sensors whose medicine is no longer listed, and since when
-    gone_since: dict[str, datetime] = {}
-
-    @callback
-    def _expire(gone: set[str], registered: dict[str, str]) -> None:
-        """Remove the sensors that have been gone for REMOVE_AFTER."""
-        now = dt_util.utcnow()
-        for unique_id in gone_since.keys() - gone:
-            del gone_since[unique_id]
-        for unique_id in gone:
-            if now - gone_since.setdefault(unique_id, now) < REMOVE_AFTER:
-                continue
-            del gone_since[unique_id]
-            key = next((k for k in known if _dose_unique_id(*k) == unique_id), None)
-            if key is not None:
-                entity = known.pop(key)
-                if entity.hass is not None and unique_id not in registered:
-                    hass.async_create_task(entity.async_remove())
-            if (entity_id := registered.get(unique_id)) is not None:
-                er.async_get(hass).async_remove(entity_id)
-
-    @callback
-    def _check() -> None:
-        wanted: dict[tuple[str, str, str, str], dict[str, Any]] = {}
-        for baby_id, baby in coordinator.data.items():
-            for kind in DOSE_KINDS:
-                for item in baby.items(kind):
-                    item_id = str(item["id"])
-                    wanted[(baby_id, kind, item_id, "last_given")] = item
-                    if parse_dose_gap(item.get("doseMinTime")):
-                        wanted[(baby_id, kind, item_id, "next_dose")] = item
-
-        # A medicine Sprout Track stops listing keeps its sensors (unavailable)
-        # for REMOVE_AFTER; those of a baby that is missing for now stay.
-        wanted_ids = {_dose_unique_id(*key) for key in wanted}
-
-        def waiting(unique_id: str) -> bool:
-            """Return whether the sensor's baby is only missing for now."""
-            return any(unique_id.startswith(f"{b}_") for b in coordinator.missing_since)
-
-        registry = er.async_get(hass)
-        gone: set[str] = set()
-        for key in known.keys() - wanted.keys():
-            if not waiting(unique_id := _dose_unique_id(*key)):
-                gone.add(unique_id)
-        # Also sensors of medicines that went away while the integration was
-        # not running (or reloading): those are only in the registry.
-        registered = {
-            reg_entry.unique_id: reg_entry.entity_id
-            for reg_entry in er.async_entries_for_config_entry(registry, entry.entry_id)
-            if reg_entry.domain == "sensor" and reg_entry.unique_id.endswith(DOSE_SUFFIXES)
-        }
-        gone.update(
-            unique_id
-            for unique_id in registered
-            if unique_id not in wanted_ids and not waiting(unique_id)
-        )
-        _expire(gone, registered)
-
-        new = [
-            SproutTrackDoseSensor(coordinator, *key, name=str(wanted[key].get("name") or ""))
-            for key in sorted(wanted.keys() - known.keys())
-        ]
-        if new:
-            known.update({entity.dose_key: entity for entity in new})
-            async_add_entities(new)
-
-    _check()
-    entry.async_on_unload(coordinator.async_add_listener(_check))
+    # Every medicine gets *last given*; those with a minimum gap *next dose* too
+    add_dose_entities(
+        hass,
+        entry,
+        async_add_entities,
+        domain="sensor",
+        whiches=lambda item: (
+            ("last_given", "next_dose")
+            if parse_dose_gap(item.get("doseMinTime"))
+            else ("last_given",)
+        ),
+        factory=lambda coordinator, key, name: SproutTrackDoseSensor(coordinator, key, name=name),
+        all_whiches=DOSE_WHICHES,
+    )
 
 
 class SproutTrackSensor(SproutTrackEntity, SensorEntity):
@@ -584,46 +502,10 @@ class SproutTrackMeasurementSensor(SproutTrackEntity, SensorEntity):
         return {"date": date} if date else None
 
 
-class SproutTrackDoseSensor(SproutTrackEntity, SensorEntity):
+class SproutTrackDoseSensor(SproutTrackDoseEntity, SensorEntity):
     """When one medicine (or supplement) was last given, or may be given next."""
 
     _attr_device_class = SensorDeviceClass.TIMESTAMP
-
-    def __init__(
-        self,
-        coordinator: SproutTrackCoordinator,
-        baby_id: str,
-        kind: str,
-        item_id: str,
-        which: str,
-        *,
-        name: str,
-    ) -> None:
-        """Set up the sensor; the medicine's name goes into the entity name."""
-        super().__init__(coordinator, baby_id, f"{kind}_{item_id}_{which}")
-        self.dose_key = (baby_id, kind, item_id, which)
-        self._kind = kind
-        self._item_id = item_id
-        self._which = which
-        self._attr_translation_key = f"{kind}_{which}"
-        self._attr_translation_placeholders = {"name": name}
-
-    @property
-    def _item(self) -> dict[str, Any] | None:
-        return self.baby.item(self._kind, self._item_id)
-
-    @property
-    def _last_dose(self) -> dict[str, Any] | None:
-        item = self._item
-        if item is None:
-            return None
-        doses = self.baby.doses_of(self._kind, str(item.get("name") or ""))
-        return doses[0] if doses else None
-
-    @property
-    def available(self) -> bool:
-        """Return whether Sprout Track still lists this medicine."""
-        return super().available and self._item is not None
 
     @property
     def native_value(self) -> datetime | None:
@@ -631,9 +513,9 @@ class SproutTrackDoseSensor(SproutTrackEntity, SensorEntity):
         dose = self._last_dose
         if dose is None:
             return None
-        if self._which == "last_given":
+        if self.dose_key[3] == "last_given":
             return _timestamp(dose.get("time"))
-        return _next_dose(self.baby, self._kind, dose)
+        return self.baby.next_dose(self._kind, dose)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:

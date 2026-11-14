@@ -108,6 +108,24 @@ class BabyData:
         folded = name.casefold()
         return [d for d in doses if dose_name(d, kind).casefold() == folded]
 
+    def last_dose(self, kind: str, item_id: str) -> dict[str, Any] | None:
+        """Return the latest dose of one medicine (or supplement), if any."""
+        item = self.item(kind, item_id)
+        if item is None:
+            return None
+        doses = self.doses_of(kind, str(item.get("name") or ""))
+        return doses[0] if doses else None
+
+    def next_dose(self, kind: str, dose: dict[str, Any]) -> datetime | None:
+        """Return when the next dose of a dose's medicine is allowed, if it has a gap."""
+        name = dose_name(dose, kind).casefold()
+        item = next(
+            (i for i in self.items(kind) if str(i.get("name", "")).casefold() == name), None
+        )
+        gap = parse_dose_gap(item.get("doseMinTime")) if item else None
+        given = dt_util.parse_datetime(str(dose.get("time")))
+        return given + gap if gap and given else None
+
     def fed_since(self, since: datetime) -> float:
         """Return how much was fed since a time, in millilitres.
 

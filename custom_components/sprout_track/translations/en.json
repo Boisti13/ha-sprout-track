@@ -108,7 +108,9 @@
       "feed_overdue": { "name": "Feed overdue" },
       "diaper_overdue": { "name": "Diaper overdue" },
       "breastfeeding": { "name": "Breastfeeding" },
-      "pumping": { "name": "Pumping" }
+      "pumping": { "name": "Pumping" },
+      "medicine_dose_allowed": { "name": "{name} dose allowed" },
+      "supplement_dose_allowed": { "name": "{name} dose allowed" }
     },
     "button": {
       "log_wet_diaper": { "name": "Log wet diaper" },

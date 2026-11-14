@@ -174,7 +174,9 @@
       },
       "pumping": {
         "name": "Abpumpen"
-      }
+      },
+      "medicine_dose_allowed": { "name": "{name} erlaubt" },
+      "supplement_dose_allowed": { "name": "{name} erlaubt" }
     },
     "button": {
       "log_wet_diaper": {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.binary_sensor import (
@@ -11,14 +12,26 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.event import async_track_point_in_utc_time
+from homeassistant.util import dt as dt_util
 
-from .coordinator import BabyData, SproutTrackConfigEntry, SproutTrackCoordinator
-from .entity import SproutTrackEntity, add_entities_per_baby
+from .const import DOSE_KINDS
+from .coordinator import BabyData, SproutTrackConfigEntry, SproutTrackCoordinator, parse_dose_gap
+from .entity import (
+    SproutTrackDoseEntity,
+    SproutTrackEntity,
+    add_dose_entities,
+    add_entities_per_baby,
+)
 
 PARALLEL_UPDATES = 0
+
+# Made per medicine and supplement (not in BINARY_SENSORS: they come and go
+# with the medicines set up in Sprout Track)
+DOSE_TRANSLATION_KEYS = tuple(f"{kind}_dose_allowed" for kind in DOSE_KINDS)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -99,6 +112,18 @@ async def async_setup_entry(
         ]
 
     add_entities_per_baby(entry, async_add_entities, factory)
+    # Medicines with a minimum time between doses: may it be given now?
+    add_dose_entities(
+        hass,
+        entry,
+        async_add_entities,
+        domain="binary_sensor",
+        whiches=lambda item: ("dose_allowed",) if parse_dose_gap(item.get("doseMinTime")) else (),
+        factory=lambda coordinator, key, name: SproutTrackDoseAllowedSensor(
+            coordinator, key, name=name
+        ),
+        all_whiches=("dose_allowed",),
+    )
 
 
 class SproutTrackBinarySensor(SproutTrackEntity, BinarySensorEntity):
@@ -128,3 +153,72 @@ class SproutTrackBinarySensor(SproutTrackEntity, BinarySensorEntity):
             return None
         attrs = self.entity_description.attrs_fn(self.baby)
         return {key: value for key, value in attrs.items() if value is not None}
+
+
+class SproutTrackDoseAllowedSensor(SproutTrackDoseEntity, BinarySensorEntity):
+    """On while a medicine may be given: its minimum gap since the last dose has passed.
+
+    Turns on at that moment by itself, not only at the next update.
+    """
+
+    _unsub_timer: CALLBACK_TYPE | None = None
+
+    @property
+    def available(self) -> bool:
+        """Return whether the medicine still has a minimum gap."""
+        return (
+            super().available and parse_dose_gap((self._item or {}).get("doseMinTime")) is not None
+        )
+
+    @property
+    def _next_dose(self) -> datetime | None:
+        dose = self._last_dose
+        return self.baby.next_dose(self._kind, dose) if dose else None
+
+    @property
+    def is_on(self) -> bool:
+        """Return whether the next dose is allowed (also when none was given lately)."""
+        next_dose = self._next_dose
+        return next_dose is None or dt_util.utcnow() >= next_dose
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return when the next dose is allowed, while that is still ahead."""
+        next_dose = self._next_dose
+        if next_dose is None or dt_util.utcnow() >= next_dose:
+            return None
+        return {"allowed_from": dt_util.as_local(next_dose).isoformat()}
+
+    async def async_added_to_hass(self) -> None:
+        """Start the timer for the current data."""
+        await super().async_added_to_hass()
+        self._schedule()
+        self.async_on_remove(self._cancel_timer)
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        self._schedule()
+        super()._handle_coordinator_update()
+
+    @callback
+    def _cancel_timer(self) -> None:
+        if self._unsub_timer is not None:
+            self._unsub_timer()
+            self._unsub_timer = None
+
+    @callback
+    def _schedule(self) -> None:
+        """Wake up when the next dose becomes allowed."""
+        self._cancel_timer()
+        if not self.available:
+            return
+        next_dose = self._next_dose
+        if next_dose is not None and next_dose > dt_util.utcnow():
+            self._unsub_timer = async_track_point_in_utc_time(
+                self.hass, self._allowed_now, next_dose
+            )
+
+    @callback
+    def _allowed_now(self, _now: datetime) -> None:
+        self._unsub_timer = None
+        self.async_write_ha_state()

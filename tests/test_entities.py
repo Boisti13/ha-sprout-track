@@ -696,3 +696,72 @@ def test_merge_doses() -> None:
     ]
     assert [d["id"] for d in merge_doses(cached, fresh, since, 3)] == ["n0", "n1", "n2", "old"]
     assert merge_doses(cached, fresh, since, 4) == fresh
+
+
+async def test_dose_allowed(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """*Dose allowed* turns on by itself once the minimum gap has passed."""
+    freezer.move_to("2026-11-12T15:00:00+00:00")  # last dose 13:38, gap 4 h
+    mock_api(aioclient_mock, reference=_reference_with_gap())
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    allowed = hass.states.get("binary_sensor.emma_paracetamol_dose_allowed")
+    assert allowed.state == "off"
+    assert allowed.attributes["allowed_from"] == "2026-11-12T09:38:21.893000-08:00"  # local
+    # Never given (Mia): allowed; no gap (Vitamin D): no such sensor
+    assert _state(hass, "binary_sensor.mia_paracetamol_dose_allowed") == "on"
+    assert hass.states.get("binary_sensor.emma_vitamin_d_dose_allowed") is None
+
+    # An update shortly before: still off
+    freezer.move_to("2026-11-12T17:38:00+00:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert _state(hass, "binary_sensor.emma_paracetamol_dose_allowed") == "off"
+
+    # 22 seconds later, before the next update is due, it turns on by itself
+    calls = aioclient_mock.call_count
+    freezer.move_to("2026-11-12T17:38:22+00:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    allowed = hass.states.get("binary_sensor.emma_paracetamol_dose_allowed")
+    assert allowed.state == "on"
+    assert "allowed_from" not in allowed.attributes
+    assert aioclient_mock.call_count == calls  # no update needed for that
+
+    # The gap removed in Sprout Track: the sensor goes after the usual day
+    mock_api(aioclient_mock)
+    freezer.tick(timedelta(minutes=16))
+    await _poll(hass)
+    assert _state(hass, "binary_sensor.emma_paracetamol_dose_allowed") == STATE_UNAVAILABLE
+    freezer.tick(timedelta(hours=24))
+    await _poll(hass)
+    assert hass.states.get("binary_sensor.emma_paracetamol_dose_allowed") is None
+    assert er.async_get(hass).async_get("binary_sensor.emma_paracetamol_dose_allowed") is None
+
+
+async def test_device_follows_baby_name(
+    hass: HomeAssistant, loaded: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """A baby renamed in Sprout Track renames the device; entity IDs stay."""
+    babies = load("babies")
+    babies["data"]["babies"][0]["firstName"] = "Emilia"
+    mock_api(aioclient_mock, babies=babies)
+    await _poll(hass)
+    device = _device(hass, loaded, BABY_1)
+    assert device.name == "Emilia"
+    assert hass.states.get("sensor.emma_last_feed").attributes["friendly_name"] == (
+        "Emilia Last feed"
+    )
+
+    # A name given in Home Assistant is left alone
+    dr.async_get(hass).async_update_device(device.id, name_by_user="Our Emma")
+    babies["data"]["babies"][0]["firstName"] = "Em"
+    mock_api(aioclient_mock, babies=babies)
+    await _poll(hass)
+    device = _device(hass, loaded, BABY_1)
+    assert (device.name, device.name_by_user) == ("Em", "Our Emma")
