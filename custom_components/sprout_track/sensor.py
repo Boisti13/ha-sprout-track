@@ -27,7 +27,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.util import dt as dt_util
 
-from .const import DOSE_KINDS
+from .const import DOSE_KINDS, REMOVE_AFTER
 from .coordinator import (
     BabyData,
     SproutTrackConfigEntry,
@@ -432,6 +432,26 @@ def _add_dose_sensors(
     """
     coordinator = entry.runtime_data
     known: dict[tuple[str, str, str, str], SproutTrackDoseSensor] = {}
+    # Unique IDs of dose sensors whose medicine is no longer listed, and since when
+    gone_since: dict[str, datetime] = {}
+
+    @callback
+    def _expire(gone: set[str], registered: dict[str, str]) -> None:
+        """Remove the sensors that have been gone for REMOVE_AFTER."""
+        now = dt_util.utcnow()
+        for unique_id in gone_since.keys() - gone:
+            del gone_since[unique_id]
+        for unique_id in gone:
+            if now - gone_since.setdefault(unique_id, now) < REMOVE_AFTER:
+                continue
+            del gone_since[unique_id]
+            key = next((k for k in known if _dose_unique_id(*k) == unique_id), None)
+            if key is not None:
+                entity = known.pop(key)
+                if entity.hass is not None and unique_id not in registered:
+                    hass.async_create_task(entity.async_remove())
+            if (entity_id := registered.get(unique_id)) is not None:
+                er.async_get(hass).async_remove(entity_id)
 
     @callback
     def _check() -> None:
@@ -444,23 +464,32 @@ def _add_dose_sensors(
                     if parse_dose_gap(item.get("doseMinTime")):
                         wanted[(baby_id, kind, item_id, "next_dose")] = item
 
+        # A medicine Sprout Track stops listing keeps its sensors (unavailable)
+        # for REMOVE_AFTER; those of a baby that is missing for now stay.
+        wanted_ids = {_dose_unique_id(*key) for key in wanted}
+
+        def waiting(unique_id: str) -> bool:
+            """Return whether the sensor's baby is only missing for now."""
+            return any(unique_id.startswith(f"{b}_") for b in coordinator.missing_since)
+
         registry = er.async_get(hass)
+        gone: set[str] = set()
         for key in known.keys() - wanted.keys():
-            entity = known.pop(key)
-            if entity.hass is not None and not (
-                entity.entity_id and registry.async_get(entity.entity_id)
-            ):
-                hass.async_create_task(entity.async_remove())
+            if not waiting(unique_id := _dose_unique_id(*key)):
+                gone.add(unique_id)
         # Also sensors of medicines that went away while the integration was
         # not running (or reloading): those are only in the registry.
-        wanted_ids = {_dose_unique_id(*key) for key in wanted}
-        for reg_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
-            if (
-                reg_entry.domain == "sensor"
-                and reg_entry.unique_id.endswith(DOSE_SUFFIXES)
-                and reg_entry.unique_id not in wanted_ids
-            ):
-                registry.async_remove(reg_entry.entity_id)
+        registered = {
+            reg_entry.unique_id: reg_entry.entity_id
+            for reg_entry in er.async_entries_for_config_entry(registry, entry.entry_id)
+            if reg_entry.domain == "sensor" and reg_entry.unique_id.endswith(DOSE_SUFFIXES)
+        }
+        gone.update(
+            unique_id
+            for unique_id in registered
+            if unique_id not in wanted_ids and not waiting(unique_id)
+        )
+        _expire(gone, registered)
 
         new = [
             SproutTrackDoseSensor(coordinator, *key, name=str(wanted[key].get("name") or ""))
@@ -521,7 +550,11 @@ class SproutTrackMeasurementSensor(SproutTrackEntity, SensorEntity):
 
     @property
     def _measurement(self) -> dict[str, Any]:
-        return self.baby.measurements.get(self.entity_description.measurement_type) or {}
+        # Read for the unit even while unavailable, when the baby may be missing
+        baby = self.coordinator.data.get(self.baby_id)
+        if baby is None:
+            return {}
+        return baby.measurements.get(self.entity_description.measurement_type) or {}
 
     @property
     def _unit(self) -> str | None:

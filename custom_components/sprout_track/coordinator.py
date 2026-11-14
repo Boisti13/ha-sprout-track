@@ -12,6 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -28,9 +29,12 @@ from .const import (
     DOSE_HISTORY,
     DOSE_KINDS,
     DOSE_LIMIT,
+    DOSE_STORE_DELAY,
+    DOSE_STORE_VERSION,
     FEED_HISTORY,
     FEED_LIMIT,
     MEASUREMENT_INTERVAL,
+    REMOVE_AFTER,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -120,6 +124,42 @@ class BabyData:
 FEED_UNITS = {"ML": 1.0, "OZ": 29.5735}
 
 
+def merge_doses(
+    cached: list[dict[str, Any]],
+    fresh: list[dict[str, Any]],
+    since: datetime,
+    limit: int,
+) -> list[dict[str, Any]]:
+    """Combine a fresh page of doses with the ones known from before.
+
+    A page shorter than the limit holds every dose since ``since``: it
+    replaces what was known (doses deleted in Sprout Track go away too). A
+    full page was cut off; the doses older than its oldest one are then
+    taken from before, so a medicine given rarely keeps its last dose while
+    another one is given often.
+    """
+    if len(fresh) < limit:
+        return fresh
+    times = [t for dose in fresh if (t := dt_util.parse_datetime(str(dose.get("time"))))]
+    if not times:
+        return fresh
+    oldest = min(times)
+    fresh_ids = {dose.get("id") for dose in fresh}
+    older = [
+        dose
+        for dose in cached
+        if dose.get("id") not in fresh_ids
+        and (t := dt_util.parse_datetime(str(dose.get("time"))))
+        and since <= t <= oldest
+    ]
+    return [*fresh, *older]
+
+
+def dose_store(hass: HomeAssistant, entry_id: str) -> Store[dict[str, Any]]:
+    """Return the file the doses of a config entry are saved in."""
+    return Store(hass, DOSE_STORE_VERSION, f"{DOMAIN}.{entry_id}.doses")
+
+
 def dose_name(dose: dict[str, Any], kind: str) -> str:
     """Return the name of the medicine (or supplement) a dose was of."""
     return str((dose.get("details") or {}).get(f"{kind}Name") or "")
@@ -156,11 +196,34 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         self._feeds: dict[str, list[dict[str, Any]]] = {}
         # The last feed each fetch saw in the status (ID and time), per baby
         self._feed_marks: dict[str, Any] = {}
+        # Babies Sprout Track stopped listing, and since when (see REMOVE_AFTER)
+        self.missing_since: dict[str, datetime] = {}
+        self._store = dose_store(hass, entry.entry_id)
+
+    async def _async_setup(self) -> None:
+        """Load the doses saved before the last restart."""
+        saved = await self._store.async_load() or {}
+        for key, doses in (saved.get("doses") or {}).items():
+            baby_id, _, kind = key.partition("|")
+            if kind in DOSE_KINDS and isinstance(doses, list):
+                self._doses[(baby_id, kind)] = [d for d in doses if isinstance(d, dict)]
+
+    async def async_shutdown(self) -> None:
+        """Write the doses now (on unload), not after the save delay."""
+        await super().async_shutdown()
+        if self._doses:
+            await self._store.async_save(self._dose_store_data())
+
+    def _dose_store_data(self) -> dict[str, Any]:
+        return {
+            "doses": {f"{baby_id}|{kind}": doses for (baby_id, kind), doses in self._doses.items()}
+        }
 
     async def _async_update_data(self) -> dict[str, BabyData]:
         try:
             babies, _ = await self.client.get_babies()
             ids = [str(baby["id"]) for baby in babies]
+            self._track_missing(set(ids))
             timezone = self.hass.config.time_zone
             statuses = await asyncio.gather(
                 *(self.client.get_status(baby_id, timezone) for baby_id in ids)
@@ -192,7 +255,7 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         except SproutTrackError as err:
             raise UpdateFailed(str(err)) from err
 
-        data = {
+        return {
             baby_id: BabyData(
                 info=baby,
                 status=status,
@@ -203,8 +266,6 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
             )
             for baby_id, baby, status in zip(ids, babies, statuses, strict=True)
         }
-        self._remove_stale_devices(set(data))
-        return data
 
     async def _update_doses(
         self,
@@ -231,12 +292,22 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
                     for baby_id, kind, _ in wanted
                 )
             )
+            since_time = now - DOSE_HISTORY
             for (baby_id, kind, mark), doses in zip(wanted, results, strict=True):
-                self._doses[(baby_id, kind)] = doses
-                self._dose_marks[(baby_id, kind)] = mark
-        for key in [key for key in self._doses if key[0] not in ids]:
+                key = (baby_id, kind)
+                self._doses[key] = merge_doses(
+                    self._doses.get(key, []), doses, since_time, DOSE_LIMIT
+                )
+                self._dose_marks[key] = mark
+        # A baby that is only missing for now keeps its doses
+        gone = [
+            key for key in self._doses if key[0] not in ids and key[0] not in self.missing_since
+        ]
+        for key in gone:
             del self._doses[key]
             self._dose_marks.pop(key, None)
+        if wanted or gone:
+            self._store.async_delay_save(self._dose_store_data, DOSE_STORE_DELAY)
 
     async def _update_feeds(
         self,
@@ -272,15 +343,34 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         """Fetch the measurements again on the next update."""
         self._measurements_at = None
 
-    def _remove_stale_devices(self, current: set[str]) -> None:
-        """Remove the devices of babies Sprout Track no longer lists."""
+    def forget(self, baby_id: str) -> None:
+        """Stop waiting for a baby whose device was deleted by hand."""
+        self.missing_since.pop(baby_id, None)
+
+    def _track_missing(self, current: set[str]) -> None:
+        """Remove the devices of babies Sprout Track hasn't listed for a while.
+
+        A baby that is missing from one answer only goes unavailable; its
+        device (and with it the entities, their IDs and settings) is removed
+        once it has been missing for REMOVE_AFTER.
+        """
+        now = dt_util.utcnow()
         registry = dr.async_get(self.hass)
+        missing: dict[str, datetime] = {}
         for device in dr.async_entries_for_config_entry(registry, self.config_entry.entry_id):
             baby_ids = {
                 identifier[1] for identifier in device.identifiers if identifier[0] == DOMAIN
             }
-            if baby_ids and not baby_ids & current:
-                _LOGGER.info("Removing %s: no longer listed by Sprout Track", device.name)
+            if not baby_ids or baby_ids & current:
+                continue
+            since = min(self.missing_since.get(baby_id, now) for baby_id in baby_ids)
+            if now - since >= REMOVE_AFTER:
+                _LOGGER.info("Removing %s: not listed by Sprout Track since %s", device.name, since)
                 registry.async_update_device(
                     device.id, remove_config_entry_id=self.config_entry.entry_id
                 )
+                continue
+            if since == now:
+                _LOGGER.info("%s is no longer listed by Sprout Track", device.name)
+            missing.update(dict.fromkeys(baby_ids, since))
+        self.missing_since = missing

@@ -104,7 +104,8 @@ Entity IDs start with the baby's first name, e.g. `sensor.emma_last_feed`.
 | *Name* next dose | time the next dose is allowed (in the past once it is) | same |
 
 *Next dose* exists only for medicines with a minimum time between doses
-(see *Good to know*). A medicine deleted in Sprout Track loses its sensors.
+(see *Good to know*). A medicine deleted in Sprout Track goes unavailable
+and loses its sensors a day later.
 
 *Medicines today* and *Supplements today* carry two lists for dashboards
 and templates, newest first, times in local time:
@@ -249,8 +250,17 @@ automation:
   minimum time between doses (`doseMinTime`). Released versions don't yet
   ([Oak-and-Sprout/sprout-track#298](https://github.com/Oak-and-Sprout/sprout-track/issues/298));
   until then only *last given* appears.
-- **Removing a baby:** a baby made inactive in Sprout Track loses its
-  device in Home Assistant at the next update.
+- **Removing a baby:** a baby Sprout Track no longer lists (made
+  inactive, deleted) goes unavailable and loses its device in Home
+  Assistant after 24 hours. The wait keeps entity IDs, names and history
+  safe from a single odd answer, such as an empty list while the server is
+  being updated; a baby back within the day carries on as before. To
+  remove it at once, delete the device by hand (*Delete* on its device
+  page, offered while the baby is missing).
+- **Many doses:** Sprout Track returns at most 50 doses of a kind at a
+  time. When a month holds more, the older doses are kept from earlier
+  updates (and saved across restarts), so a medicine given rarely keeps
+  its *last given* while another is given often.
 - **Troubleshooting:** *Download diagnostics* on the integration gives a
   file without names, dates, IDs or the key. Debug log:
   `custom_components.sprout_track: debug` under `logger:`.

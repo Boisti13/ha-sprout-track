@@ -25,7 +25,17 @@ MEASUREMENT_INTERVAL = timedelta(minutes=15)
 DOSE_KINDS = ("medicine", "supplement")
 DOSE_HISTORY = timedelta(days=30)
 DOSE_LIMIT = 50  # the API's maximum
+# A full page of doses means older ones were cut off; those are kept from
+# earlier fetches (and saved across restarts) instead of being forgotten.
+DOSE_STORE_VERSION = 1
+DOSE_STORE_DELAY = 10  # seconds to gather changes before writing the file
 FEED_HISTORY = timedelta(hours=24)  # covers today and the last 24 hours
 FEED_LIMIT = 50
+
+# A baby or medicine Sprout Track stops listing keeps its device and
+# entities (unavailable) this long before they are removed, so one odd
+# answer (an empty list during a server update, a medicine switched off for
+# a day) doesn't throw away entity IDs, names and history.
+REMOVE_AFTER = timedelta(hours=24)
 
 MANUFACTURER = "Sprout Track"

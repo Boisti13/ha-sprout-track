@@ -11,7 +11,7 @@ from homeassistant.helpers.typing import ConfigType
 
 from .api import SproutTrackClient
 from .const import DOMAIN
-from .coordinator import SproutTrackConfigEntry, SproutTrackCoordinator
+from .coordinator import SproutTrackConfigEntry, SproutTrackCoordinator, dose_store
 from .services import async_setup_services
 
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.SENSOR]
@@ -46,7 +46,17 @@ async def async_remove_config_entry_device(
     hass: HomeAssistant, entry: SproutTrackConfigEntry, device: DeviceEntry
 ) -> bool:
     """Allow deleting a device by hand only if its baby is gone."""
-    return not any(
-        identifier[0] == DOMAIN and identifier[1] in entry.runtime_data.data
-        for identifier in device.identifiers
-    )
+    coordinator = entry.runtime_data
+    baby_ids = [identifier[1] for identifier in device.identifiers if identifier[0] == DOMAIN]
+    if any(baby_id in coordinator.data for baby_id in baby_ids):
+        return False
+    for baby_id in baby_ids:
+        coordinator.forget(baby_id)
+    # Let the platforms forget the baby, so it gets new entities if it comes back
+    coordinator.async_update_listeners()
+    return True
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: SproutTrackConfigEntry) -> None:
+    """Delete the saved doses along with the entry."""
+    await dose_store(hass, entry.entry_id).async_remove()
