@@ -25,6 +25,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClien
 from custom_components.sprout_track import coordinator as coordinator_module
 from custom_components.sprout_track.const import DOMAIN, DOSE_LIMIT
 from custom_components.sprout_track.coordinator import merge_doses, parse_dose_gap
+from custom_components.sprout_track.entity import attribute_value
 
 from .conftest import API, BABY_1, BABY_2, api_error, load, mock_api
 
@@ -64,12 +65,12 @@ async def test_sensors(hass: HomeAssistant, loaded: MockConfigEntry) -> None:
     """Values come out of the recorded status as expected."""
     assert _state(hass, "sensor.emma_last_feed") == "2026-11-12T13:38:21+00:00"
     feed = hass.states.get("sensor.emma_last_feed").attributes
-    assert feed["feed_type"] == "BOTTLE"
+    assert feed["feed_type"] == "bottle"
     assert feed["amount"] == 120
     assert "caretaker" not in feed  # empty fields are left out
 
     assert _state(hass, "sensor.emma_last_diaper") == "2026-11-12T13:38:21+00:00"
-    assert hass.states.get("sensor.emma_last_diaper").attributes["diaper_type"] == "WET"
+    assert hass.states.get("sensor.emma_last_diaper").attributes["diaper_type"] == "wet"
     assert _state(hass, "sensor.emma_sleep_state") == "awake"
     assert _state(hass, "sensor.emma_asleep_since") == STATE_UNKNOWN
     assert _state(hass, "sensor.emma_awake_since") == "2026-11-12T09:45:00+00:00"
@@ -141,7 +142,7 @@ async def test_asleep_and_timers(
     await _poll(hass)
 
     assert _state(hass, "binary_sensor.emma_sleeping") == "on"
-    assert hass.states.get("binary_sensor.emma_sleeping").attributes["sleep_type"] == "NIGHT_SLEEP"
+    assert hass.states.get("binary_sensor.emma_sleeping").attributes["sleep_type"] == "night_sleep"
     assert _state(hass, "sensor.emma_sleep_state") == "night_sleep"
     assert _state(hass, "sensor.emma_asleep_since") == "2026-11-12T19:00:00+00:00"
     assert _state(hass, "sensor.emma_awake_since") == STATE_UNKNOWN
@@ -149,7 +150,7 @@ async def test_asleep_and_timers(
     assert _state(hass, "binary_sensor.emma_pumping") == "on"
     assert _state(hass, "sensor.emma_last_pump") == "2026-11-12T19:01:00+00:00"
     assert _state(hass, "binary_sensor.emma_breastfeeding") == "on"
-    assert hass.states.get("binary_sensor.emma_breastfeeding").attributes["side"] == "LEFT"
+    assert hass.states.get("binary_sensor.emma_breastfeeding").attributes["side"] == "left"
 
     # A sleep type this version does not know still counts as asleep
     last["sleep"]["type"] = None
@@ -799,3 +800,13 @@ async def test_notice_without_dose_gaps(
     assert issues.async_get_issue(DOMAIN, issue_id) is not None
     assert await hass.config_entries.async_remove(entry.entry_id)
     assert issues.async_get_issue(DOMAIN, issue_id) is None
+
+
+def test_attribute_values() -> None:
+    """Fixed words become options; anything else stays as it was."""
+    assert attribute_value("bottle_type", "Breast Milk") == "breast_milk"
+    assert attribute_value("bottle_type", "formula/breast") == "formula_breast"
+    assert attribute_value("bath_type", "Sponge Bath") == "sponge_bath"
+    assert attribute_value("bath_type", "Bucket bath") == "Bucket bath"
+    assert attribute_value("diaper_type", None) is None
+    assert attribute_value("caretaker", "WET") == "WET"

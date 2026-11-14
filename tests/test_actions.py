@@ -12,6 +12,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.sprout_track.const import DOMAIN
+from custom_components.sprout_track.entity import ATTRIBUTE_OPTIONS
 
 from .conftest import API, BABY_1, BABY_2, api_error, load, mock_api
 
@@ -443,6 +444,12 @@ def test_translations_cover_everything() -> None:
                 expected |= set(binary_sensor.DOSE_TRANSLATION_KEYS)
             assert set(strings["entity"][platform]) == expected
         assert set(strings["entity"]["sensor"]["sleep_state"]["state"]) == set(sensor.SLEEP_STATES)
+        # Attributes with fixed values: every option has a text
+        for platform, entities in strings["entity"].items():
+            for name, texts in entities.items():
+                for attr, attr_texts in (texts.get("state_attributes") or {}).items():
+                    options = set(ATTRIBUTE_OPTIONS[attr].values())
+                    assert set(attr_texts["state"]) == options, (platform, name, attr)
 
 
 def test_brand_icons() -> None:

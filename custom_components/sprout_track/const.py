@@ -40,4 +40,17 @@ FEED_LIMIT = 50
 # a day) doesn't throw away entity IDs, names and history.
 REMOVE_AFTER = timedelta(hours=24)
 
+# Attribute values Sprout Track sends as fixed words (WET, NIGHT_SLEEP,
+# Breast Milk ...): shown as lowercase options (wet, night_sleep,
+# breast_milk), translated in the UI. Anything else (a custom bath type)
+# stays as Sprout Track sent it.
+ATTRIBUTE_VALUES = {
+    "feed_type": ("BREAST", "BOTTLE", "SOLIDS"),
+    "bottle_type": ("Formula", "Breast Milk", "Formula/Breast", "Milk", "Other"),
+    "diaper_type": ("WET", "DIRTY", "BOTH", "DRY"),
+    "sleep_type": ("NAP", "NIGHT_SLEEP"),
+    "bath_type": ("Full Bath", "Sponge Bath", "Wipe Down"),
+    "side": ("LEFT", "RIGHT"),
+}
+
 MANUFACTURER = "Sprout Track"

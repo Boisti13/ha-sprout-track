@@ -66,10 +66,32 @@
   "entity": {
     "sensor": {
       "last_feed": {
-        "name": "Letzte Mahlzeit"
+        "name": "Letzte Mahlzeit",
+        "state_attributes": {
+          "feed_type": {
+            "name": "Art",
+            "state": { "breast": "Brust", "bottle": "Flasche", "solids": "Beikost" }
+          },
+          "bottle_type": {
+            "name": "Flascheninhalt",
+            "state": {
+              "formula": "Pre-Nahrung",
+              "breast_milk": "Muttermilch",
+              "formula_breast": "Pre-Nahrung und Muttermilch",
+              "milk": "Milch",
+              "other": "Andere"
+            }
+          }
+        }
       },
       "last_diaper": {
-        "name": "Letzte Windel"
+        "name": "Letzte Windel",
+        "state_attributes": {
+          "diaper_type": {
+            "name": "Windel",
+            "state": { "wet": "Nass", "dirty": "Voll", "both": "Nass und voll", "dry": "Trocken" }
+          }
+        }
       },
       "sleep_state": {
         "name": "Schlafzustand",
@@ -87,10 +109,26 @@
         "name": "Wach seit"
       },
       "last_sleep_duration": {
-        "name": "Dauer des letzten Schlafs"
+        "name": "Dauer des letzten Schlafs",
+        "state_attributes": {
+          "sleep_type": {
+            "name": "Schlafart",
+            "state": { "nap": "Nickerchen", "night_sleep": "Nachtschlaf" }
+          }
+        }
       },
       "last_bath": {
-        "name": "Letztes Bad"
+        "name": "Letztes Bad",
+        "state_attributes": {
+          "bath_type": {
+            "name": "Badeart",
+            "state": {
+              "full_bath": "Vollbad",
+              "sponge_bath": "Waschen mit Schwamm",
+              "wipe_down": "Abwischen"
+            }
+          }
+        }
       },
       "last_medicine": {
         "name": "Letztes Medikament"
@@ -161,7 +199,13 @@
     },
     "binary_sensor": {
       "sleeping": {
-        "name": "Schläft"
+        "name": "Schläft",
+        "state_attributes": {
+          "sleep_type": {
+            "name": "Schlafart",
+            "state": { "nap": "Nickerchen", "night_sleep": "Nachtschlaf" }
+          }
+        }
       },
       "feed_overdue": {
         "name": "Mahlzeit überfällig"
@@ -170,7 +214,10 @@
         "name": "Windel überfällig"
       },
       "breastfeeding": {
-        "name": "Stillen"
+        "name": "Stillen",
+        "state_attributes": {
+          "side": { "name": "Seite", "state": { "left": "Links", "right": "Rechts" } }
+        }
       },
       "pumping": {
         "name": "Abpumpen"

@@ -65,8 +65,34 @@
   },
   "entity": {
     "sensor": {
-      "last_feed": { "name": "Last feed" },
-      "last_diaper": { "name": "Last diaper" },
+      "last_feed": {
+        "name": "Last feed",
+        "state_attributes": {
+          "feed_type": {
+            "name": "Feed type",
+            "state": { "breast": "Breast", "bottle": "Bottle", "solids": "Solids" }
+          },
+          "bottle_type": {
+            "name": "Bottle content",
+            "state": {
+              "formula": "Formula",
+              "breast_milk": "Breast milk",
+              "formula_breast": "Formula and breast milk",
+              "milk": "Milk",
+              "other": "Other"
+            }
+          }
+        }
+      },
+      "last_diaper": {
+        "name": "Last diaper",
+        "state_attributes": {
+          "diaper_type": {
+            "name": "Diaper",
+            "state": { "wet": "Wet", "dirty": "Dirty", "both": "Wet and dirty", "dry": "Dry" }
+          }
+        }
+      },
       "sleep_state": {
         "name": "Sleep state",
         "state": {
@@ -78,8 +104,28 @@
       },
       "asleep_since": { "name": "Asleep since" },
       "awake_since": { "name": "Awake since" },
-      "last_sleep_duration": { "name": "Last sleep duration" },
-      "last_bath": { "name": "Last bath" },
+      "last_sleep_duration": {
+        "name": "Last sleep duration",
+        "state_attributes": {
+          "sleep_type": {
+            "name": "Sleep type",
+            "state": { "nap": "Nap", "night_sleep": "Night sleep" }
+          }
+        }
+      },
+      "last_bath": {
+        "name": "Last bath",
+        "state_attributes": {
+          "bath_type": {
+            "name": "Bath type",
+            "state": {
+              "full_bath": "Full bath",
+              "sponge_bath": "Sponge bath",
+              "wipe_down": "Wipe down"
+            }
+          }
+        }
+      },
       "last_medicine": { "name": "Last medicine" },
       "last_supplement": { "name": "Last supplement" },
       "last_pump": { "name": "Last pump" },
@@ -104,10 +150,23 @@
       "supplement_next_dose": { "name": "{name} next dose" }
     },
     "binary_sensor": {
-      "sleeping": { "name": "Sleeping" },
+      "sleeping": {
+        "name": "Sleeping",
+        "state_attributes": {
+          "sleep_type": {
+            "name": "Sleep type",
+            "state": { "nap": "Nap", "night_sleep": "Night sleep" }
+          }
+        }
+      },
       "feed_overdue": { "name": "Feed overdue" },
       "diaper_overdue": { "name": "Diaper overdue" },
-      "breastfeeding": { "name": "Breastfeeding" },
+      "breastfeeding": {
+        "name": "Breastfeeding",
+        "state_attributes": {
+          "side": { "name": "Side", "state": { "left": "Left", "right": "Right" } }
+        }
+      },
       "pumping": { "name": "Pumping" },
       "medicine_dose_allowed": { "name": "{name} dose allowed" },
       "supplement_dose_allowed": { "name": "{name} dose allowed" }

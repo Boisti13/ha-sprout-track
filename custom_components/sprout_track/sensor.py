@@ -39,6 +39,7 @@ from .entity import (
     SproutTrackEntity,
     add_dose_entities,
     add_entities_per_baby,
+    attribute_value,
 )
 
 # The coordinator polls; entities never fetch on their own.
@@ -74,7 +75,7 @@ def _attrs(kind: str, **names: str) -> Callable[[BabyData], dict[str, Any]]:
 
     def attrs(baby: BabyData) -> dict[str, Any]:
         last = baby.last(kind)
-        return {attr: last.get(api_key) for attr, api_key in names.items()}
+        return {attr: attribute_value(attr, last.get(api_key)) for attr, api_key in names.items()}
 
     return attrs
 

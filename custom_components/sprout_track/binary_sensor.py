@@ -25,6 +25,7 @@ from .entity import (
     SproutTrackEntity,
     add_dose_entities,
     add_entities_per_baby,
+    attribute_value,
 )
 
 PARALLEL_UPDATES = 0
@@ -53,7 +54,7 @@ def _warning(key: str) -> Callable[[BabyData], bool | None]:
 def _breastfeeding_attrs(baby: BabyData) -> dict[str, Any]:
     feed = baby.status.get("activeFeed") or {}
     return {
-        "side": feed.get("activeSide"),
+        "side": attribute_value("side", feed.get("activeSide")),
         "paused": feed.get("isPaused"),
         "started": feed.get("sessionStartTime"),
     }
@@ -65,7 +66,9 @@ BINARY_SENSORS: tuple[SproutTrackBinarySensorDescription, ...] = (
         translation_key="sleeping",
         is_on_fn=lambda baby: baby.is_asleep if baby.status else None,
         attrs_fn=lambda baby: (
-            {"sleep_type": baby.last("sleep").get("type")} if baby.is_asleep else {}
+            {"sleep_type": attribute_value("sleep_type", baby.last("sleep").get("type"))}
+            if baby.is_asleep
+            else {}
         ),
     ),
     SproutTrackBinarySensorDescription(

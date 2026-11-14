@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime
+import re
 from typing import Any
 
 from homeassistant.core import HomeAssistant, callback
@@ -14,11 +15,32 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, DOSE_KINDS, MANUFACTURER, REMOVE_AFTER
+from .const import ATTRIBUTE_VALUES, DOMAIN, DOSE_KINDS, MANUFACTURER, REMOVE_AFTER
 from .coordinator import BabyData, SproutTrackConfigEntry, SproutTrackCoordinator
 
 # baby ID, kind (medicine or supplement), medicine ID, which entity of it
 type DoseKey = tuple[str, str, str, str]
+
+
+def option_key(value: str) -> str:
+    """Turn one of Sprout Track's fixed words into an option: Breast Milk -> breast_milk."""
+    return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
+
+
+# attribute -> {what Sprout Track sends: the option shown}
+ATTRIBUTE_OPTIONS = {
+    attr: {value: option_key(value) for value in values}
+    for attr, values in ATTRIBUTE_VALUES.items()
+}
+
+
+def attribute_value(attr: str, value: Any) -> Any:
+    """Return an attribute's value, its fixed words as lowercase options."""
+    options = ATTRIBUTE_OPTIONS.get(attr)
+    if options is None or not isinstance(value, str):
+        return value
+    folded = value.casefold()
+    return next((o for v, o in options.items() if v.casefold() == folded), value)
 
 
 class SproutTrackEntity(CoordinatorEntity[SproutTrackCoordinator]):
