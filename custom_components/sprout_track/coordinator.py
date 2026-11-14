@@ -12,7 +12,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, issue_registry as ir
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -28,6 +28,7 @@ from .const import (
     CONF_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    DOSE_GAP_ISSUE_URL,
     DOSE_HISTORY,
     DOSE_KINDS,
     DOSE_LIMIT,
@@ -266,6 +267,7 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
                 self._measurements = dict(zip(ids, results[: len(ids)], strict=True))
                 self._references = dict(zip(ids, results[len(ids) :], strict=True))
                 self._measurements_at = now
+                self._check_dose_gap_support()
 
             await self._update_doses(ids, statuses, now, refresh=slow_due)
             await self._update_feeds(ids, statuses, now, refresh=slow_due)
@@ -384,6 +386,35 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         for baby_id in [baby_id for baby_id in self._feeds if baby_id not in ids]:
             del self._feeds[baby_id]
             self._feed_marks.pop(baby_id, None)
+
+    def _check_dose_gap_support(self) -> None:
+        """Explain in Repairs why *next dose* is missing, when the server can't send it.
+
+        Sprout Track's released hooks API leaves out each medicine's minimum
+        time between doses (Oak-and-Sprout/sprout-track#298); a server that
+        sends it has the field on every medicine, empty or not.
+        """
+        items = [
+            item
+            for reference in self._references.values()
+            for kind in DOSE_KINDS
+            for item in reference.get(f"{kind}s") or []
+            if isinstance(item, dict)
+        ]
+        issue_id = f"no_dose_min_time_{self.config_entry.entry_id}"
+        if items and not any("doseMinTime" in item for item in items):
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                issue_id,
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                learn_more_url=DOSE_GAP_ISSUE_URL,
+                translation_key="no_dose_min_time",
+                translation_placeholders={"title": self.config_entry.title},
+            )
+        else:
+            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
 
     def invalidate_measurements(self) -> None:
         """Fetch the measurements again on the next update."""

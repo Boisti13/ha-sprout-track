@@ -24,6 +24,8 @@ MEASUREMENT_INTERVAL = timedelta(minutes=15)
 # deletions); the list of medicines with the measurements too.
 DOSE_KINDS = ("medicine", "supplement")
 DOSE_HISTORY = timedelta(days=30)
+# Released Sprout Track doesn't send minimum gaps between doses yet
+DOSE_GAP_ISSUE_URL = "https://github.com/Oak-and-Sprout/sprout-track/issues/298"
 DOSE_LIMIT = 50  # the API's maximum
 # A full page of doses means older ones were cut off; those are kept from
 # earlier fetches (and saved across restarts) instead of being forgotten.

@@ -8,7 +8,11 @@ from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import (
+    device_registry as dr,
+    entity_registry as er,
+    issue_registry as ir,
+)
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 import pytest
@@ -765,3 +769,33 @@ async def test_device_follows_baby_name(
     await _poll(hass)
     device = _device(hass, loaded, BABY_1)
     assert (device.name, device.name_by_user) == ("Em", "Our Emma")
+
+
+async def test_notice_without_dose_gaps(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """A server without minimum gaps gets a Repairs notice, gone once it sends them."""
+    issues = ir.async_get(hass)
+    issue_id = f"no_dose_min_time_{entry.entry_id}"
+    mock_api(aioclient_mock)  # the recorded reference has no doseMinTime
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    issue = issues.async_get_issue(DOMAIN, issue_id)
+    assert issue is not None
+    assert issue.translation_placeholders == {"title": "Emma & Mia"}
+
+    mock_api(aioclient_mock, reference=_reference_with_gap())
+    freezer.tick(timedelta(minutes=16))
+    await _poll(hass)
+    assert issues.async_get_issue(DOMAIN, issue_id) is None
+
+    # Removing the entry takes a notice with it
+    mock_api(aioclient_mock)
+    freezer.tick(timedelta(minutes=16))
+    await _poll(hass)
+    assert issues.async_get_issue(DOMAIN, issue_id) is not None
+    assert await hass.config_entries.async_remove(entry.entry_id)
+    assert issues.async_get_issue(DOMAIN, issue_id) is None

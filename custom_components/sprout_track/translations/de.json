@@ -571,5 +571,11 @@
       "message": "{field} passt nicht zu einer Mahlzeit der Art {feed_type}."
     },
     "unit_required": { "message": "Zur Menge die Einheit angeben (zum Beispiel ML oder OZ)." }
+  },
+  "issues": {
+    "no_dose_min_time": {
+      "title": "{title}: keine Abstände zwischen Dosen von Sprout Track",
+      "description": "Dein Sprout-Track-Server sendet den Mindestabstand zwischen den Dosen seiner Medikamente nicht, daher fehlen die Entitäten *… nächste Gabe* und *… erlaubt*; *… zuletzt gegeben* funktioniert. Veröffentlichte Versionen von Sprout Track senden ihn noch nicht. Sobald eine Version installiert ist, die ihn sendet, verschwindet dieser Hinweis von selbst."
+    }
   }
 }

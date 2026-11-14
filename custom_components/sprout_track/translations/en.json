@@ -318,5 +318,11 @@
     "side_required": { "message": "Give a side (left or right) to start breastfeeding." },
     "feed_field_mismatch": { "message": "{field} does not apply to a {feed_type} feed." },
     "unit_required": { "message": "Give the unit (for example ML or OZ) with the amount." }
+  },
+  "issues": {
+    "no_dose_min_time": {
+      "title": "{title}: no times between doses from Sprout Track",
+      "description": "Your Sprout Track server doesn't send the minimum time between doses of its medicines, so the *… next dose* and *… dose allowed* entities can't be shown; *… last given* works. Released versions of Sprout Track don't send it yet. Once a version that does is installed, this notice goes away by itself."
+    }
   }
 }

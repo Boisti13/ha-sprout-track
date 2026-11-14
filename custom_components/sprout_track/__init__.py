@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from homeassistant.const import CONF_API_KEY, CONF_URL, CONF_VERIFY_SSL, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import config_validation as cv, issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.typing import ConfigType
@@ -58,5 +58,6 @@ async def async_remove_config_entry_device(
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: SproutTrackConfigEntry) -> None:
-    """Delete the saved doses along with the entry."""
+    """Delete the saved doses and any repair notice along with the entry."""
     await dose_store(hass, entry.entry_id).async_remove()
+    ir.async_delete_issue(hass, DOMAIN, f"no_dose_min_time_{entry.entry_id}")
