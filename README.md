@@ -22,13 +22,14 @@ project and not part of Sprout Track.
 - **Set up in the UI**: address and API key, done. A new key can be
   entered later without removing anything.
 - **One device per baby**, with every baby of the family. Babies added in
-  Sprout Track appear on their own.
+  Sprout Track appear on their own; a renamed baby renames its device.
 - **25 sensors per baby**: last feed, diaper, sleep, bath, medicine and
   supplement; today's counts and millilitres fed; age; latest weight, height, head
   circumference and temperature.
 - **Per medicine and supplement**: when it was last given and, where
   Sprout Track has a minimum time between doses, when the next dose is
-  allowed. They follow the medicines set up in Sprout Track.
+  allowed and a *dose allowed* binary sensor that turns on the moment
+  it is. They follow the medicines set up in Sprout Track.
 - **Times, not counters**: "last feed" is a point in time, which Home
   Assistant shows as "2 hours ago" without the value changing every minute.
 - **Warnings as binary sensors**: feed overdue and diaper overdue, using
@@ -36,9 +37,9 @@ project and not part of Sprout Track.
 - **Buttons** for the usual one-tap entries: diapers, start nap, start
   night sleep, end sleep, and the breastfeeding timer (start left or
   right, switch side, end).
-- **Actions** for feeds, the breastfeeding timer, diapers, sleep, medicine
-  and supplements with all their details, plus one that passes any
-  activity to the API.
+- **Actions** for feeds, the breastfeeding timer, diapers, sleep, medicine,
+  supplements, baths and measurements with all their details, plus one
+  that passes any activity to the API.
 - **Careful with sleep**: a second sleep is never started while one runs.
 - **Local**: talks only to your Sprout Track server.
 - English and German.
@@ -105,8 +106,8 @@ Entity IDs start with the baby's first name, e.g. `sensor.emma_last_feed`.
 | *Name* last given | time of the last dose (last 30 days) | `amount`, `unit`, `doses_today`, `minimum_gap_minutes` |
 | *Name* next dose | time the next dose is allowed (in the past once it is) | same |
 
-*Next dose* exists only for medicines with a minimum time between doses
-(see *Good to know*). A medicine deleted in Sprout Track goes unavailable
+*Next dose* (and the binary sensor *dose allowed*, below) exists only for
+medicines with a minimum time between doses (see *Good to know*). A medicine deleted in Sprout Track goes unavailable
 and loses its sensors a day later.
 
 *Medicines today* and *Supplements today* carry two lists for dashboards
@@ -129,6 +130,12 @@ is one feed.
 | Diaper overdue | same for diapers | `warning_after` |
 | Breastfeeding | a breastfeeding timer is running | `side`, `paused`, `started` |
 | Pumping | a pump timer is running | |
+| *Name* dose allowed | per medicine with a minimum gap: the gap since its last dose has passed (or it wasn't given lately); turns on at that moment, without waiting for an update | `allowed_from` while off |
+
+Attributes with fixed values (`feed_type`, `bottle_type`, `diaper_type`,
+`sleep_type`, `bath_type`, `side`) read as lowercase words such as
+`bottle`, `breast_milk`, `wet`, `night_sleep`, `left`, shown translated in
+the UI. A custom bath type stays as it was typed.
 
 ### Buttons
 
@@ -162,6 +169,8 @@ returns what Sprout Track created if you ask for the response.
 | `sprout_track.log_sleep` | `sleep_type`, `duration` (minutes), `location`, `quality`, `notes` |
 | `sprout_track.log_medicine` | `medicine` (name in Sprout Track), `amount` (default: its typical dose), `unit`, `notes` |
 | `sprout_track.log_supplement` | `supplement`, `amount`, `unit`, `notes` |
+| `sprout_track.log_bath` | `bath_type` (full_bath, sponge_bath, wipe_down, or your own text), `soap_used`, `shampoo_used` (Sprout Track assumes yes for both if left out), `notes` |
+| `sprout_track.log_measurement` | `measurement_type` (weight, height, head_circumference, temperature), `value`, `unit` (e.g. KG, LB, CM, IN, C, F) |
 | `sprout_track.log_activity` | `data`: any body the [API](https://github.com/Oak-and-Sprout/sprout-track/blob/main/documentation/Admin-Documentation/webhook-api.md) accepts (feed, bath, note, pump, measurement, food, play, ...) |
 
 ## Examples
@@ -269,10 +278,12 @@ automation:
   does not have 'write' scope".
 - **Measurements**, the list of medicines and all doses are fetched every
   15 minutes (so edits and deletions in Sprout Track show up).
-- **Next dose** needs a Sprout Track whose hooks API sends each medicine's
-  minimum time between doses (`doseMinTime`). Released versions don't yet
+- **Next dose** and **dose allowed** need a Sprout Track whose hooks API
+  sends each medicine's minimum time between doses (`doseMinTime`).
+  Released versions don't yet
   ([Oak-and-Sprout/sprout-track#298](https://github.com/Oak-and-Sprout/sprout-track/issues/298));
-  until then only *last given* appears.
+  until then only *last given* appears, and *Settings → Repairs* says so.
+  The notice goes away by itself once the server sends the field.
 - **Removing a baby:** a baby Sprout Track no longer lists (made
   inactive, deleted) goes unavailable and loses its device in Home
   Assistant after 24 hours. The wait keeps entity IDs, names and history
@@ -284,6 +295,9 @@ automation:
   time. When a month holds more, the older doses are kept from earlier
   updates (and saved across restarts), so a medicine given rarely keeps
   its *last given* while another is given often.
+- **Renaming:** a baby renamed in Sprout Track renames its device (and
+  so the entities' names); entity IDs stay. A name you gave the device in
+  Home Assistant wins.
 - **Troubleshooting:** *Download diagnostics* on the integration gives a
   file without names, dates, IDs or the key. Debug log:
   `custom_components.sprout_track: debug` under `logger:`.
@@ -295,7 +309,7 @@ custom_components/sprout_track/
   api.py            HTTP client for /api/hooks/v1
   coordinator.py    polling, one data set per baby
   config_flow.py    setup, re-auth, reconfigure, options
-  entity.py         base entity, one device per baby
+  entity.py         base entities, one device per baby, per-medicine entities
   sensor.py  binary_sensor.py  button.py
   services.py       actions (and what the buttons send)
   services.yaml  icons.json  translations/
@@ -310,9 +324,16 @@ uv venv --python 3.14 ~/.venvs/sprout-track-ha
 uv pip install --python ~/.venvs/sprout-track-ha/bin/python -r requirements_test.txt
 ~/.venvs/sprout-track-ha/bin/python -m pytest -q
 ~/.venvs/sprout-track-ha/bin/ruff check . && ~/.venvs/sprout-track-ha/bin/ruff format --check .
+
+# The same tests on the oldest supported Home Assistant (2025.8.0)
+uv venv --python 3.13 ~/.venvs/sprout-track-ha-min
+uv pip install --python ~/.venvs/sprout-track-ha-min/bin/python -r requirements_test_min.txt
+~/.venvs/sprout-track-ha-min/bin/python -m pytest -q
 ```
 
-Tested with Sprout Track 1.6.8 and Home Assistant 2026.10. Work happens on
+Tested with Sprout Track 1.6.8 and Home Assistant 2026.10; the GitHub
+checks also run the tests on Home Assistant 2025.8.0, the oldest version
+it supports. Work happens on
 `dev`, releases are tagged on `main`; see [CHANGELOG.md](CHANGELOG.md).
 Issues and pull requests are welcome.
 

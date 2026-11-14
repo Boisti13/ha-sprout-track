@@ -48,6 +48,10 @@ owner's setup.
   PNG32:…/icon.png`, density 384 and 512x512 for `@2x`). An original
   drawing: never Sprout Track's own logo. ImageMagick's SVG renderer drops
   stroked curves without fill; draw shapes as filled paths.
+- **Attribute values with a fixed set** (API words like `WET`,
+  `Breast Milk`) go through `attribute_value()` into lowercase options
+  (`ATTRIBUTE_VALUES` in `const.py`) and get `state_attributes` texts in
+  both translations; the translation test checks them.
 - **Timestamps, not "minutes ago".** The API's `minutesAgo` changes every
   minute; sensors expose the time instead and Home Assistant shows
   "5 minutes ago" itself. Don't add counters that tick.
@@ -59,6 +63,11 @@ owner's setup.
   `uv pip install -r requirements_test.txt`), then
   `~/.venvs/sprout-track-ha/bin/python -m pytest -q` and
   `ruff check . && ruff format --check .`. All must pass before a push.
+  Also on the oldest supported Home Assistant (2025.8.0, the minimum in
+  `hacs.json`): venv `~/.venvs/sprout-track-ha-min` (Python 3.13) from
+  `requirements_test_min.txt`, same `pytest -q`; CI runs it too. Newer
+  Home Assistant APIs need a fallback there (see `retry_after` in
+  `coordinator.py`) or a raised minimum in both files.
 - **Trying it for real:** the owner's test Sprout Track (no real data; where it
   runs is in the owner's private notes) plus a throwaway Home Assistant from the
   same venv (`hass -c <scratch dir>` with `custom_components/sprout_track`

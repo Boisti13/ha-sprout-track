@@ -1,5 +1,48 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Dose allowed** (`binary_sensor.<baby>_<medicine>_dose_allowed`) for
+  every medicine and supplement with a minimum time between doses: on
+  while it may be given, and it turns on the moment the gap has passed,
+  without waiting for an update; attribute `allowed_from` while off.
+- **`sprout_track.log_bath`** (bath type, soap, shampoo, notes) and
+  **`sprout_track.log_measurement`** (weight, height, head circumference
+  or temperature with value and unit).
+- **Repairs notice** when the Sprout Track server doesn't send minimum
+  times between doses (released versions don't yet), explaining why
+  *next dose* and *dose allowed* are missing; it goes away by itself.
+- A baby renamed in Sprout Track **renames its device**; a name given in
+  Home Assistant still wins, entity IDs stay.
+
+### Changed
+
+- **Attribute values are lowercase words now**, translated in the UI:
+  `feed_type` (`bottle`, `breast`, `solids`), `bottle_type` (`formula`,
+  `breast_milk`, `formula_breast`, `milk`, `other`), `diaper_type`
+  (`wet`, `dirty`, `both`, `dry`), `sleep_type` (`nap`, `night_sleep`),
+  `bath_type` (`full_bath`, `sponge_bath`, `wipe_down`; custom types
+  unchanged) and `side` (`left`, `right`) — they were Sprout Track's
+  `BOTTLE`, `Breast Milk`, `WET`, `NIGHT_SLEEP`, `LEFT` … **Templates and
+  automations that compare these attributes need the new words** (or
+  `| upper` on the value to accept both).
+
+### Fixed
+
+- **Home Assistant 2025.8 to 2025.x:** v0.4.0's wait after "too many
+  requests" passed an argument those versions don't know, so such an
+  update failed with an unexpected error. It now waits only where Home
+  Assistant supports it.
+
+### Under the hood
+
+- The GitHub checks also run the tests on Home Assistant 2025.8.0, the
+  oldest version `hacs.json` names (`requirements_test_min.txt`).
+- The handling of per-medicine entities (adding, the 24-hour wait,
+  removal) is shared by sensors and binary sensors (`entity.py`).
+
 ## v0.4.0 — 2026-11-14
 
 ### Added
