@@ -33,6 +33,8 @@ SERVICE_LOG_SUPPLEMENT = "log_supplement"
 SERVICE_LOG_ACTIVITY = "log_activity"
 SERVICE_LOG_FEED = "log_feed"
 SERVICE_BREASTFEEDING = "breastfeeding"
+SERVICE_LOG_BATH = "log_bath"
+SERVICE_LOG_MEASUREMENT = "log_measurement"
 
 ATTR_TIME = "time"
 ATTR_CARETAKER = "caretaker"
@@ -55,6 +57,11 @@ ATTR_FEED_TYPE = "feed_type"
 ATTR_BOTTLE_TYPE = "bottle_type"
 ATTR_SIDE = "side"
 ATTR_ACTION = "action"
+ATTR_BATH_TYPE = "bath_type"
+ATTR_SOAP_USED = "soap_used"
+ATTR_SHAMPOO_USED = "shampoo_used"
+ATTR_MEASUREMENT_TYPE = "measurement_type"
+ATTR_VALUE = "value"
 
 DIAPER_TYPES = ["wet", "dirty", "both", "dry"]
 DIAPER_CONDITIONS = ["normal", "loose", "firm", "other"]
@@ -71,6 +78,8 @@ BOTTLE_TYPES = {
     "other": "Other",
 }
 SIDES = ["left", "right"]
+BATH_TYPES = {"full_bath": "Full Bath", "sponge_bath": "Sponge Bath", "wipe_down": "Wipe Down"}
+MEASUREMENT_TYPES = ["weight", "height", "head_circumference", "temperature"]
 BREASTFEEDING_ACTIONS = ["start", "switch", "pause", "resume", "end"]
 # Fields that only fit one kind of feed
 _BOTTLE_ONLY = (ATTR_BOTTLE_TYPE,)
@@ -156,6 +165,26 @@ BREASTFEEDING_SCHEMA = vol.Schema(
         vol.Required(ATTR_ACTION): _lower_in(BREASTFEEDING_ACTIONS),
         vol.Optional(ATTR_SIDE): _lower_in(SIDES),
         vol.Optional(ATTR_CARETAKER): cv.string,
+    }
+)
+
+LOG_BATH_SCHEMA = vol.Schema(
+    {
+        **_COMMON,
+        # One of the app's bath types, or any text (the app allows custom ones)
+        vol.Optional(ATTR_BATH_TYPE): cv.string,
+        vol.Optional(ATTR_SOAP_USED): cv.boolean,
+        vol.Optional(ATTR_SHAMPOO_USED): cv.boolean,
+        vol.Optional(ATTR_NOTES): cv.string,
+    }
+)
+
+LOG_MEASUREMENT_SCHEMA = vol.Schema(
+    {
+        **_COMMON,
+        vol.Required(ATTR_MEASUREMENT_TYPE): _lower_in(MEASUREMENT_TYPES),
+        vol.Required(ATTR_VALUE): vol.All(vol.Coerce(float), vol.Range(min=0)),
+        vol.Optional(ATTR_UNIT): cv.string,
     }
 )
 
@@ -337,6 +366,33 @@ async def _breastfeeding(hass: HomeAssistant, call: ServiceCall) -> ServiceRespo
     return await async_log_activity(coordinator, baby_id, payload)
 
 
+async def _log_bath(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
+    """Log a bath."""
+    coordinator, baby_id = _resolve_baby(hass, call.data.get(ATTR_DEVICE_ID))
+    payload: dict[str, Any] = {"type": "bath", **_common_payload(call)}
+    if bath_type := call.data.get(ATTR_BATH_TYPE):
+        payload["bathType"] = BATH_TYPES.get(bath_type.lower(), bath_type)
+    _copy(
+        call,
+        payload,
+        {ATTR_SOAP_USED: "soapUsed", ATTR_SHAMPOO_USED: "shampooUsed", ATTR_NOTES: "notes"},
+    )
+    return await async_log_activity(coordinator, baby_id, payload)
+
+
+async def _log_measurement(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
+    """Log a weight, height, head circumference or temperature."""
+    coordinator, baby_id = _resolve_baby(hass, call.data.get(ATTR_DEVICE_ID))
+    payload: dict[str, Any] = {
+        "type": "measurement",
+        "measurementType": call.data[ATTR_MEASUREMENT_TYPE].upper(),
+        "value": _whole(call.data[ATTR_VALUE]),
+        **_common_payload(call),
+    }
+    _copy(call, payload, {ATTR_UNIT: "unit"})
+    return await async_log_activity(coordinator, baby_id, payload)
+
+
 @callback
 def async_setup_services(hass: HomeAssistant) -> None:
     """Register the integration's actions."""
@@ -470,6 +526,8 @@ def async_setup_services(hass: HomeAssistant) -> None:
         (SERVICE_LOG_SUPPLEMENT, log_supplement, LOG_SUPPLEMENT_SCHEMA),
         (SERVICE_LOG_FEED, partial(_log_feed, hass), LOG_FEED_SCHEMA),
         (SERVICE_BREASTFEEDING, partial(_breastfeeding, hass), BREASTFEEDING_SCHEMA),
+        (SERVICE_LOG_BATH, partial(_log_bath, hass), LOG_BATH_SCHEMA),
+        (SERVICE_LOG_MEASUREMENT, partial(_log_measurement, hass), LOG_MEASUREMENT_SCHEMA),
         (SERVICE_LOG_ACTIVITY, log_activity, LOG_ACTIVITY_SCHEMA),
     ):
         hass.services.async_register(

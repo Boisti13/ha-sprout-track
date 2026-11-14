@@ -310,6 +310,21 @@
         "resume": "Fortsetzen",
         "end": "Beenden"
       }
+    },
+    "bath_type": {
+      "options": {
+        "full_bath": "Vollbad",
+        "sponge_bath": "Waschen mit Schwamm",
+        "wipe_down": "Abwischen"
+      }
+    },
+    "measurement_type": {
+      "options": {
+        "weight": "Gewicht",
+        "height": "Größe",
+        "head_circumference": "Kopfumfang",
+        "temperature": "Temperatur"
+      }
     }
   },
   "services": {
@@ -576,6 +591,55 @@
           "name": "Seite",
           "description": "Zum Starten nötig; beim Fortsetzen optional für die andere Seite."
         },
+        "caretaker": {
+          "name": "Betreuungsperson",
+          "description": "Name einer Betreuungsperson, wie in Sprout Track eingerichtet."
+        }
+      }
+    },
+    "log_bath": {
+      "name": "Bad eintragen",
+      "description": "Trägt ein Bad ein.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Kann entfallen, solange nur ein Baby eingerichtet ist."
+        },
+        "bath_type": {
+          "name": "Badeart",
+          "description": "Eine der Badearten der App oder ein eigener Text."
+        },
+        "soap_used": {
+          "name": "Seife",
+          "description": "Ob Seife benutzt wurde. Sprout Track nimmt ja an, wenn leer."
+        },
+        "shampoo_used": {
+          "name": "Shampoo",
+          "description": "Ob Shampoo benutzt wurde. Sprout Track nimmt ja an, wenn leer."
+        },
+        "notes": { "name": "Notizen", "description": "Freitext." },
+        "time": { "name": "Zeit", "description": "Wann gebadet wurde. Jetzt, wenn leer." },
+        "caretaker": {
+          "name": "Betreuungsperson",
+          "description": "Name einer Betreuungsperson, wie in Sprout Track eingerichtet."
+        }
+      }
+    },
+    "log_measurement": {
+      "name": "Messung eintragen",
+      "description": "Trägt Gewicht, Größe, Kopfumfang oder Temperatur ein.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Kann entfallen, solange nur ein Baby eingerichtet ist."
+        },
+        "measurement_type": { "name": "Messung", "description": "Was gemessen wurde." },
+        "value": { "name": "Wert", "description": "Der gemessene Wert." },
+        "unit": {
+          "name": "Einheit",
+          "description": "Einheit wie in Sprout Track eingerichtet, zum Beispiel KG, LB, CM, IN, C oder F."
+        },
+        "time": { "name": "Zeit", "description": "Wann gemessen wurde. Jetzt, wenn leer." },
         "caretaker": {
           "name": "Betreuungsperson",
           "description": "Name einer Betreuungsperson, wie in Sprout Track eingerichtet."

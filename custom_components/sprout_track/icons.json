@@ -64,6 +64,8 @@
     "log_supplement": { "service": "mdi:eyedropper" },
     "log_activity": { "service": "mdi:notebook-plus-outline" },
     "log_feed": { "service": "mdi:baby-bottle-outline" },
-    "breastfeeding": { "service": "mdi:mother-nurse" }
+    "breastfeeding": { "service": "mdi:mother-nurse" },
+    "log_bath": { "service": "mdi:bathtub-outline" },
+    "log_measurement": { "service": "mdi:scale-baby" }
   }
 }

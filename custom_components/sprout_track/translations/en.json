@@ -226,6 +226,21 @@
         "resume": "Resume",
         "end": "End"
       }
+    },
+    "bath_type": {
+      "options": {
+        "full_bath": "Full bath",
+        "sponge_bath": "Sponge bath",
+        "wipe_down": "Wipe down"
+      }
+    },
+    "measurement_type": {
+      "options": {
+        "weight": "Weight",
+        "height": "Height",
+        "head_circumference": "Head circumference",
+        "temperature": "Temperature"
+      }
     }
   },
   "services": {
@@ -357,6 +372,55 @@
           "name": "Side",
           "description": "Needed to start; optional to resume on another side."
         },
+        "caretaker": {
+          "name": "Caretaker",
+          "description": "Name of a caretaker as set up in Sprout Track."
+        }
+      }
+    },
+    "log_bath": {
+      "name": "Log bath",
+      "description": "Logs a bath.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Can be left out while only one baby is set up."
+        },
+        "bath_type": {
+          "name": "Bath type",
+          "description": "One of the app's bath types, or your own text."
+        },
+        "soap_used": {
+          "name": "Soap",
+          "description": "Whether soap was used. Sprout Track assumes yes if left out."
+        },
+        "shampoo_used": {
+          "name": "Shampoo",
+          "description": "Whether shampoo was used. Sprout Track assumes yes if left out."
+        },
+        "notes": { "name": "Notes", "description": "Free text." },
+        "time": { "name": "Time", "description": "When the bath was. Now if left out." },
+        "caretaker": {
+          "name": "Caretaker",
+          "description": "Name of a caretaker as set up in Sprout Track."
+        }
+      }
+    },
+    "log_measurement": {
+      "name": "Log measurement",
+      "description": "Logs a weight, height, head circumference or temperature.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Can be left out while only one baby is set up."
+        },
+        "measurement_type": { "name": "Measurement", "description": "What was measured." },
+        "value": { "name": "Value", "description": "The measured value." },
+        "unit": {
+          "name": "Unit",
+          "description": "Unit as set up in Sprout Track, for example KG, LB, CM, IN, C or F."
+        },
+        "time": { "name": "Time", "description": "When it was measured. Now if left out." },
         "caretaker": {
           "name": "Caretaker",
           "description": "Name of a caretaker as set up in Sprout Track."
