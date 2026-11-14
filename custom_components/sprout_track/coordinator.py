@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+import inspect
 import logging
 from typing import Any
 
@@ -41,6 +42,9 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 type SproutTrackConfigEntry = ConfigEntry[SproutTrackCoordinator]
+
+# UpdateFailed takes retry_after only in newer Home Assistant versions
+_UPDATE_FAILED_RETRY_AFTER = "retry_after" in inspect.signature(UpdateFailed.__init__).parameters
 
 
 def parse_dose_gap(value: Any) -> timedelta | None:
@@ -251,8 +255,13 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
             raise ConfigEntryAuthFailed(err.message) from err
         except SproutTrackRateLimitError as err:
             # Wait as long as the server asks before the next update (Home
-            # Assistant then returns to the normal interval)
-            raise UpdateFailed(f"{err.code}: {err.message}", retry_after=err.retry_after) from err
+            # Assistant then returns to the normal interval); older versions
+            # of Home Assistant can't, and just try again at the next one
+            if _UPDATE_FAILED_RETRY_AFTER:
+                raise UpdateFailed(
+                    f"{err.code}: {err.message}", retry_after=err.retry_after
+                ) from err
+            raise UpdateFailed(f"{err.code}: {err.message}") from err
         except SproutTrackApiError as err:
             if err.code == "INSUFFICIENT_SCOPE":
                 raise ConfigEntryAuthFailed(err.message) from err
@@ -260,7 +269,7 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         except SproutTrackError as err:
             raise UpdateFailed(str(err)) from err
 
-        return {
+        data = {
             baby_id: BabyData(
                 info=baby,
                 status=status,
@@ -271,6 +280,20 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
             )
             for baby_id, baby, status in zip(ids, babies, statuses, strict=True)
         }
+        self._sync_device_names(data)
+        return data
+
+    def _sync_device_names(self, data: dict[str, BabyData]) -> None:
+        """Rename a baby's device when the baby is renamed in Sprout Track.
+
+        A name given in Home Assistant (name_by_user) still wins; entity IDs
+        stay as they are.
+        """
+        registry = dr.async_get(self.hass)
+        for baby_id, baby in data.items():
+            device = registry.async_get_device(identifiers={(DOMAIN, baby_id)})
+            if device is not None and device.name != baby.name:
+                registry.async_update_device(device.id, name=baby.name)
 
     async def _update_doses(
         self,

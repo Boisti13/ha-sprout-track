@@ -11,12 +11,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
+import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
 )
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
+from custom_components.sprout_track import coordinator as coordinator_module
 from custom_components.sprout_track.const import DOMAIN, DOSE_LIMIT
 from custom_components.sprout_track.coordinator import merge_doses, parse_dose_gap
 
@@ -344,6 +346,8 @@ async def test_rate_limit_waits(
     hass: HomeAssistant, loaded: MockConfigEntry, aioclient_mock: AiohttpClientMocker
 ) -> None:
     """After HTTP 429 the next update waits as long as Retry-After says."""
+    if not coordinator_module._UPDATE_FAILED_RETRY_AFTER:
+        pytest.skip("this Home Assistant has no retry_after")
     aioclient_mock.clear_requests()
     aioclient_mock.get(
         f"{API}/babies", status=429, json=api_error("RATE_LIMITED"), headers={"Retry-After": "300"}
