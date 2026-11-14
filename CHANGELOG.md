@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added
+
+- **`sprout_track.log_feed`**: logs a bottle (amount with unit, bottle
+  content) or a finished breastfeed (side, duration). A bottle amount
+  needs its unit; without one Sprout Track would store a bare number that
+  *Fed today* can't count.
+- **`sprout_track.breastfeeding`**: starts, switches, pauses, resumes or
+  ends the breastfeeding timer, the same one the Sprout Track app shows.
+- **Buttons** *Start breastfeeding left / right*, *Switch breastfeeding
+  side* and *End breastfeeding* for every baby.
+
 ### Fixed
 
 - **Devices and entities vanished after one odd answer.** A baby missing
@@ -18,6 +29,9 @@
   page are now kept from earlier updates and saved across restarts
   (`.storage/sprout_track.<entry>.doses`, deleted with the entry).
 - Measurement sensors raised an error while their baby was missing.
+- **Too many requests:** when Sprout Track answers HTTP 429, the next
+  update now waits as long as its `Retry-After` says instead of trying
+  again after the normal interval.
 
 ## v0.3.0 — 2026-11-13
 

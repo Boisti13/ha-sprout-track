@@ -48,9 +48,9 @@ async def test_devices(hass: HomeAssistant, loaded: MockConfigEntry) -> None:
     assert emma.manufacturer == "Sprout Track"
     assert emma.configuration_url == "http://192.168.1.50:3000"
     entities = er.async_entries_for_device(er.async_get(hass), emma.id)
-    # 25 sensors, 5 binary sensors, 6 buttons, *last given* for Paracetamol
+    # 25 sensors, 5 binary sensors, 10 buttons, *last given* for Paracetamol
     # and Vitamin D (no *next dose*: no minimum gap in the fixture)
-    assert len(entities) == 25 + 5 + 6 + 2
+    assert len(entities) == 25 + 5 + 10 + 2
     assert all(e.unique_id.startswith(f"{BABY_1}_") for e in entities)
 
 
@@ -337,6 +337,26 @@ async def test_update_fails_and_recovers(
 
     mock_api(aioclient_mock)
     await _poll(hass)
+    assert _state(hass, "sensor.emma_feeds_today") == "1"
+
+
+async def test_rate_limit_waits(
+    hass: HomeAssistant, loaded: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """After HTTP 429 the next update waits as long as Retry-After says."""
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(
+        f"{API}/babies", status=429, json=api_error("RATE_LIMITED"), headers={"Retry-After": "300"}
+    )
+    await _poll(hass)
+    assert _state(hass, "sensor.emma_feeds_today") == STATE_UNAVAILABLE
+
+    mock_api(aioclient_mock)
+    await _poll(hass)  # one normal interval later: not asked yet
+    assert aioclient_mock.call_count == 0
+    assert _state(hass, "sensor.emma_feeds_today") == STATE_UNAVAILABLE
+
+    await _poll(hass, 300)
     assert _state(hass, "sensor.emma_feeds_today") == "1"
 
 

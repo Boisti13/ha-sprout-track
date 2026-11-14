@@ -46,7 +46,11 @@
       "log_wet_and_dirty_diaper": { "default": "mdi:human-baby-changing-table" },
       "start_nap": { "default": "mdi:sleep" },
       "start_night_sleep": { "default": "mdi:weather-night" },
-      "end_sleep": { "default": "mdi:sleep-off" }
+      "end_sleep": { "default": "mdi:sleep-off" },
+      "start_breastfeeding_left": { "default": "mdi:mother-nurse" },
+      "start_breastfeeding_right": { "default": "mdi:mother-nurse" },
+      "switch_breastfeeding_side": { "default": "mdi:swap-horizontal" },
+      "end_breastfeeding": { "default": "mdi:stop-circle-outline" }
     }
   },
   "services": {
@@ -56,6 +60,8 @@
     "log_sleep": { "service": "mdi:sleep" },
     "log_medicine": { "service": "mdi:pill" },
     "log_supplement": { "service": "mdi:eyedropper" },
-    "log_activity": { "service": "mdi:notebook-plus-outline" }
+    "log_activity": { "service": "mdi:notebook-plus-outline" },
+    "log_feed": { "service": "mdi:baby-bottle-outline" },
+    "breastfeeding": { "service": "mdi:mother-nurse" }
   }
 }

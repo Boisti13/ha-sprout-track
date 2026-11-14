@@ -21,6 +21,7 @@ from .api import (
     SproutTrackAuthError,
     SproutTrackClient,
     SproutTrackError,
+    SproutTrackRateLimitError,
 )
 from .const import (
     CONF_SCAN_INTERVAL,
@@ -248,6 +249,10 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
             await self._update_feeds(ids, statuses, now, refresh=slow_due)
         except SproutTrackAuthError as err:
             raise ConfigEntryAuthFailed(err.message) from err
+        except SproutTrackRateLimitError as err:
+            # Wait as long as the server asks before the next update (Home
+            # Assistant then returns to the normal interval)
+            raise UpdateFailed(f"{err.code}: {err.message}", retry_after=err.retry_after) from err
         except SproutTrackApiError as err:
             if err.code == "INSUFFICIENT_SCOPE":
                 raise ConfigEntryAuthFailed(err.message) from err

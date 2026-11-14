@@ -194,7 +194,11 @@
       },
       "end_sleep": {
         "name": "Schlaf beenden"
-      }
+      },
+      "start_breastfeeding_left": { "name": "Stillen links starten" },
+      "start_breastfeeding_right": { "name": "Stillen rechts starten" },
+      "switch_breastfeeding_side": { "name": "Stillseite wechseln" },
+      "end_breastfeeding": { "name": "Stillen beenden" }
     }
   },
   "selector": {
@@ -236,6 +240,26 @@
         "fair": "Mäßig",
         "good": "Gut",
         "excellent": "Sehr gut"
+      }
+    },
+    "feed_type": { "options": { "bottle": "Flasche", "breast": "Brust" } },
+    "bottle_type": {
+      "options": {
+        "formula": "Pre-Nahrung",
+        "breast_milk": "Muttermilch",
+        "formula_breast": "Pre-Nahrung und Muttermilch",
+        "milk": "Milch",
+        "other": "Andere"
+      }
+    },
+    "breast_side": { "options": { "left": "Links", "right": "Rechts" } },
+    "breastfeeding_action": {
+      "options": {
+        "start": "Starten",
+        "switch": "Seite wechseln",
+        "pause": "Pausieren",
+        "resume": "Fortsetzen",
+        "end": "Beenden"
       }
     }
   },
@@ -461,6 +485,53 @@
           "description": "Der Inhalt der Anfrage wie in Sprout Tracks Webhook-API-Dokumentation beschrieben; braucht mindestens type."
         }
       }
+    },
+    "log_feed": {
+      "name": "Mahlzeit eintragen",
+      "description": "Trägt eine Flaschenmahlzeit oder ein beendetes Stillen ein.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Kann entfallen, solange nur ein Baby eingerichtet ist."
+        },
+        "feed_type": { "name": "Art", "description": "Flasche oder Brust." },
+        "amount": { "name": "Menge", "description": "Wie viel getrunken wurde (Flasche)." },
+        "unit": {
+          "name": "Einheit",
+          "description": "Einheit der Menge wie in Sprout Track eingerichtet, zum Beispiel ML oder OZ. Mit einer Menge nötig."
+        },
+        "bottle_type": { "name": "Flascheninhalt", "description": "Was in der Flasche war." },
+        "side": { "name": "Seite", "description": "Welche Brust (nur Stillen)." },
+        "duration": { "name": "Dauer", "description": "Dauer des Stillens in Minuten." },
+        "notes": { "name": "Notizen", "description": "Freitext." },
+        "time": {
+          "name": "Zeit",
+          "description": "Wann gefüttert wurde (Beginn beim Stillen). Jetzt, wenn leer."
+        },
+        "caretaker": {
+          "name": "Betreuungsperson",
+          "description": "Name einer Betreuungsperson, wie in Sprout Track eingerichtet."
+        }
+      }
+    },
+    "breastfeeding": {
+      "name": "Still-Timer",
+      "description": "Startet, wechselt, pausiert, setzt fort oder beendet den Still-Timer, den auch die Sprout-Track-App zeigt.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Kann entfallen, solange nur ein Baby eingerichtet ist."
+        },
+        "action": { "name": "Aktion", "description": "Was mit dem Timer geschehen soll." },
+        "side": {
+          "name": "Seite",
+          "description": "Zum Starten nötig; beim Fortsetzen optional für die andere Seite."
+        },
+        "caretaker": {
+          "name": "Betreuungsperson",
+          "description": "Name einer Betreuungsperson, wie in Sprout Track eingerichtet."
+        }
+      }
     }
   },
   "exceptions": {
@@ -490,6 +561,13 @@
     },
     "amount_required": {
       "message": "{name} hat in Sprout Track keine übliche Dosis. Eine Menge angeben."
-    }
+    },
+    "side_required": {
+      "message": "Zum Starten des Stillens eine Seite angeben (links oder rechts)."
+    },
+    "feed_field_mismatch": {
+      "message": "{field} passt nicht zu einer Mahlzeit der Art {feed_type}."
+    },
+    "unit_required": { "message": "Zur Menge die Einheit angeben (zum Beispiel ML oder OZ)." }
   }
 }

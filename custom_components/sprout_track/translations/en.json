@@ -116,7 +116,11 @@
       "log_wet_and_dirty_diaper": { "name": "Log wet and dirty diaper" },
       "start_nap": { "name": "Start nap" },
       "start_night_sleep": { "name": "Start night sleep" },
-      "end_sleep": { "name": "End sleep" }
+      "end_sleep": { "name": "End sleep" },
+      "start_breastfeeding_left": { "name": "Start breastfeeding left" },
+      "start_breastfeeding_right": { "name": "Start breastfeeding right" },
+      "switch_breastfeeding_side": { "name": "Switch breastfeeding side" },
+      "end_breastfeeding": { "name": "End breastfeeding" }
     }
   },
   "selector": {
@@ -141,6 +145,26 @@
     },
     "sleep_quality": {
       "options": { "poor": "Poor", "fair": "Fair", "good": "Good", "excellent": "Excellent" }
+    },
+    "feed_type": { "options": { "bottle": "Bottle", "breast": "Breast" } },
+    "bottle_type": {
+      "options": {
+        "formula": "Formula",
+        "breast_milk": "Breast milk",
+        "formula_breast": "Formula and breast milk",
+        "milk": "Milk",
+        "other": "Other"
+      }
+    },
+    "breast_side": { "options": { "left": "Left", "right": "Right" } },
+    "breastfeeding_action": {
+      "options": {
+        "start": "Start",
+        "switch": "Switch side",
+        "pause": "Pause",
+        "resume": "Resume",
+        "end": "End"
+      }
     }
   },
   "services": {
@@ -230,6 +254,53 @@
         "device_id": { "name": "Baby", "description": "Can be left out while only one baby is set up." },
         "data": { "name": "Payload", "description": "The request body as described in Sprout Track's webhook API documentation; needs at least a type." }
       }
+    },
+    "log_feed": {
+      "name": "Log feed",
+      "description": "Logs a bottle feed or a finished breastfeed.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Can be left out while only one baby is set up."
+        },
+        "feed_type": { "name": "Type", "description": "Bottle or breast." },
+        "amount": { "name": "Amount", "description": "How much was drunk (bottle)." },
+        "unit": {
+          "name": "Unit",
+          "description": "Unit of the amount as set up in Sprout Track, for example ML or OZ. Needed with an amount."
+        },
+        "bottle_type": { "name": "Bottle content", "description": "What was in the bottle." },
+        "side": { "name": "Side", "description": "Which breast (breastfeed only)." },
+        "duration": { "name": "Duration", "description": "Length of the breastfeed in minutes." },
+        "notes": { "name": "Notes", "description": "Free text." },
+        "time": {
+          "name": "Time",
+          "description": "When the feed was (start of a breastfeed). Now if left out."
+        },
+        "caretaker": {
+          "name": "Caretaker",
+          "description": "Name of a caretaker as set up in Sprout Track."
+        }
+      }
+    },
+    "breastfeeding": {
+      "name": "Breastfeeding timer",
+      "description": "Starts, switches, pauses, resumes or ends the breastfeeding timer shared with the Sprout Track app.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "Can be left out while only one baby is set up."
+        },
+        "action": { "name": "Action", "description": "What to do with the timer." },
+        "side": {
+          "name": "Side",
+          "description": "Needed to start; optional to resume on another side."
+        },
+        "caretaker": {
+          "name": "Caretaker",
+          "description": "Name of a caretaker as set up in Sprout Track."
+        }
+      }
     }
   },
   "exceptions": {
@@ -241,6 +312,9 @@
     "already_asleep": { "message": "{name} is already asleep." },
     "medicine_not_found": { "message": "Sprout Track has no medicine called {name}. Available: {available}" },
     "supplement_not_found": { "message": "Sprout Track has no supplement called {name}. Available: {available}" },
-    "amount_required": { "message": "{name} has no typical dose in Sprout Track. Give an amount." }
+    "amount_required": { "message": "{name} has no typical dose in Sprout Track. Give an amount." },
+    "side_required": { "message": "Give a side (left or right) to start breastfeeding." },
+    "feed_field_mismatch": { "message": "{field} does not apply to a {feed_type} feed." },
+    "unit_required": { "message": "Give the unit (for example ML or OZ) with the amount." }
   }
 }
