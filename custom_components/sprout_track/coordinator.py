@@ -355,8 +355,17 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         stay as they are.
         """
         registry = dr.async_get(self.hass)
+        # The entry's own devices (async_get_device by identifier is
+        # deprecated from Home Assistant 2026.11; its replacement doesn't
+        # exist in older versions)
+        devices = {
+            identifier[1]: device
+            for device in dr.async_entries_for_config_entry(registry, self.config_entry.entry_id)
+            for identifier in device.identifiers
+            if identifier[0] == DOMAIN
+        }
         for baby_id, baby in data.items():
-            device = registry.async_get_device(identifiers={(DOMAIN, baby_id)})
+            device = devices.get(baby_id)
             if device is not None and device.name != baby.name:
                 registry.async_update_device(device.id, name=baby.name)
 
