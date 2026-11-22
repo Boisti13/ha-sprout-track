@@ -23,7 +23,8 @@ owner's setup.
   `coordinator.py` polls `/babies`, each baby's `/status` every interval,
   `/measurements/latest` and `/reference` every 15 min, and the medicine
   and supplement doses (`/activities?type=…`, 30 days) when the status
-  shows a new one or with the 15-min fetch, into one `BabyData` per baby
+  shows a new one or with the 15-min fetch, the same for the diaper list
+  (newest dirty diaper, `newest_dirty_diaper()`), into one `BabyData` per baby
   (a full page of 50 doses is merged with the older doses known from
   before, saved in `.storage/sprout_track.<entry>.doses`);
   `entity.py` has the base entity and `add_entities_per_baby()` (babies

@@ -23,7 +23,7 @@ project and not part of Sprout Track.
   entered later without removing anything.
 - **One device per baby**, with every baby of the family. Babies added in
   Sprout Track appear on their own; a renamed baby renames its device.
-- **25 sensors per baby**: last feed, diaper, sleep, bath, medicine and
+- **26 sensors per baby**: last feed, diaper, dirty diaper, sleep, bath, medicine and
   supplement; today's counts and millilitres fed; age; latest weight, height, head
   circumference and temperature.
 - **Per medicine and supplement**: when it was last given and, where
@@ -78,6 +78,7 @@ Entity IDs start with the baby's first name, e.g. `sensor.emma_last_feed`.
 |---|---|---|
 | Last feed | time | `feed_type`, `amount`, `unit`, `bottle_type`, `caretaker` |
 | Last diaper | time | `diaper_type`, `caretaker` |
+| Last dirty diaper | time of the newest dirty (or wet-and-dirty) diaper in the last 30 days | `diaper_type`, `caretaker` |
 | Sleep state | Awake / Nap / Night sleep | |
 | Asleep since | time, while asleep | |
 | Awake since | time, while awake | |
@@ -273,10 +274,11 @@ automation:
   up with the next update.
 - **API limits:** Sprout Track allows each key 60 reads and 30 writes per
   minute. An update costs one read plus one per baby; give other tools
-  their own key. Doses are only fetched when the status shows a new one.
+  their own key. Doses and diapers are only fetched when the status shows
+  a new one.
 - **Read-only key:** sensors work; buttons and actions answer "This key
   does not have 'write' scope".
-- **Measurements**, the list of medicines and all doses are fetched every
+- **Measurements**, the list of medicines, all doses and the diaper list are fetched every
   15 minutes (so edits and deletions in Sprout Track show up).
 - **Next dose** and **dose allowed** need a Sprout Track whose hooks API
   sends each medicine's minimum time between doses (`doseMinTime`).

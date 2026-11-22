@@ -93,6 +93,15 @@
           }
         }
       },
+      "last_dirty_diaper": {
+        "name": "Letzte volle Windel",
+        "state_attributes": {
+          "diaper_type": {
+            "name": "Windel",
+            "state": { "wet": "Nass", "dirty": "Voll", "both": "Nass und voll", "dry": "Trocken" }
+          }
+        }
+      },
       "sleep_state": {
         "name": "Schlafzustand",
         "state": {

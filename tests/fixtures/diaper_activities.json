@@ -1,0 +1,51 @@
+{
+  "success": true,
+  "data": {
+    "activities": [
+      {
+        "activityType": "diaper",
+        "id": "diaper-3",
+        "time": "2026-11-12T13:38:21.854Z",
+        "details": {
+          "type": "WET",
+          "condition": null,
+          "color": null,
+          "blowout": false,
+          "creamApplied": false,
+          "notes": null
+        },
+        "caretakerName": null
+      },
+      {
+        "activityType": "diaper",
+        "id": "diaper-2",
+        "time": "2026-11-12T08:05:00.000Z",
+        "details": {
+          "type": "BOTH",
+          "condition": null,
+          "color": null,
+          "blowout": false,
+          "creamApplied": false,
+          "notes": null
+        },
+        "caretakerName": null
+      },
+      {
+        "activityType": "diaper",
+        "id": "diaper-1",
+        "time": "2026-11-11T19:30:00.000Z",
+        "details": {
+          "type": "DIRTY",
+          "condition": null,
+          "color": null,
+          "blowout": false,
+          "creamApplied": false,
+          "notes": null
+        },
+        "caretakerName": null
+      }
+    ],
+    "count": 3,
+    "hasMore": false
+  }
+}

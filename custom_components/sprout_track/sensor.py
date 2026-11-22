@@ -95,6 +95,14 @@ def _diapers(*types: str) -> Callable[[BabyData], StateType]:
     return count
 
 
+def _dirty_diaper_attrs(baby: BabyData) -> dict[str, Any]:
+    details = baby.dirty_diaper.get("details") or {}
+    return {
+        "diaper_type": attribute_value("diaper_type", details.get("type")),
+        "caretaker": baby.dirty_diaper.get("caretakerName"),
+    }
+
+
 def _iso(value: datetime | None) -> str | None:
     return dt_util.as_local(value).isoformat() if value else None
 
@@ -196,6 +204,13 @@ SENSORS: tuple[SproutTrackSensorDescription, ...] = (
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=_last_time("diaper"),
         attrs_fn=_attrs("diaper", diaper_type="type", caretaker="caretakerName"),
+    ),
+    SproutTrackSensorDescription(
+        key="last_dirty_diaper",
+        translation_key="last_dirty_diaper",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda baby: _timestamp(baby.dirty_diaper.get("time")),
+        attrs_fn=_dirty_diaper_attrs,
     ),
     SproutTrackSensorDescription(
         key="sleep_state",
