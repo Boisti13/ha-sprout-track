@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Deprecation warning with Home Assistant 2026.11** ("calls
+  `device_registry.async_get_device`, which is deprecated … will stop
+  working in Home Assistant 2027.8.0"): renaming a baby's device now looks
+  it up among the entry's own devices.
+
 ## v0.6.0 — 2026-11-22
 
 ### Added
