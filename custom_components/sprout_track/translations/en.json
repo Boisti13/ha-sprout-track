@@ -93,6 +93,15 @@
           }
         }
       },
+      "last_dirty_diaper": {
+        "name": "Last dirty diaper",
+        "state_attributes": {
+          "diaper_type": {
+            "name": "Diaper",
+            "state": { "wet": "Wet", "dirty": "Dirty", "both": "Wet and dirty", "dry": "Dry" }
+          }
+        }
+      },
       "sleep_state": {
         "name": "Sleep state",
         "state": {

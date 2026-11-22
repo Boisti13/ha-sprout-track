@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.6.0 — 2026-11-22
+
+### Added
+
+- **Last dirty diaper** (`sensor.<baby>_last_dirty_diaper`): when the
+  newest dirty or wet-and-dirty diaper was changed, with `diaper_type`
+  and `caretaker`. The status only names the last diaper of any kind, so
+  the diaper list (`/activities?type=diaper`, 30 days, up to 50) is
+  fetched when the status shows a new diaper and every 15 minutes. A
+  dirty diaper older than the 50 newest diapers is kept from before and
+  saved across restarts.
+
 ## v0.5.0 — 2026-11-14
 
 ### Added

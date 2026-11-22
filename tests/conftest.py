@@ -56,7 +56,7 @@ def mock_api(
         f"{API}/babies/{BABY_2}/measurements/latest",
         json={"success": True, "data": {"measurements": {}}},
     )
-    for kind in ("medicine", "supplement", "feed"):
+    for kind in ("medicine", "supplement", "feed", "diaper"):
         mock.get(
             f"{API}/babies/{BABY_1}/activities?type={kind}",
             json=(activities or {}).get(kind) or load(f"{kind}_activities"),

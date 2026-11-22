@@ -24,7 +24,11 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClien
 
 from custom_components.sprout_track import coordinator as coordinator_module
 from custom_components.sprout_track.const import DOMAIN, DOSE_LIMIT
-from custom_components.sprout_track.coordinator import merge_doses, parse_dose_gap
+from custom_components.sprout_track.coordinator import (
+    merge_doses,
+    newest_dirty_diaper,
+    parse_dose_gap,
+)
 from custom_components.sprout_track.entity import attribute_value
 
 from .conftest import API, BABY_1, BABY_2, api_error, load, mock_api
@@ -55,9 +59,9 @@ async def test_devices(hass: HomeAssistant, loaded: MockConfigEntry) -> None:
     assert emma.manufacturer == "Sprout Track"
     assert emma.configuration_url == "http://192.168.1.50:3000"
     entities = er.async_entries_for_device(er.async_get(hass), emma.id)
-    # 25 sensors, 5 binary sensors, 10 buttons, *last given* for Paracetamol
+    # 26 sensors, 5 binary sensors, 10 buttons, *last given* for Paracetamol
     # and Vitamin D (no *next dose*: no minimum gap in the fixture)
-    assert len(entities) == 25 + 5 + 10 + 2
+    assert len(entities) == 26 + 5 + 10 + 2
     assert all(e.unique_id.startswith(f"{BABY_1}_") for e in entities)
 
 
@@ -496,9 +500,9 @@ async def test_doses_fetched_on_change(
             call[0] == "GET" and "/activities" in str(call[1]) for call in aioclient_mock.mock_calls
         )
 
-    assert count() == 6  # two babies: medicines, supplements and feeds
+    assert count() == 8  # two babies: medicines, supplements, feeds and diapers
     await _poll(hass)
-    assert count() == 6
+    assert count() == 8
 
     status = load("status")
     status["data"]["lastActivities"]["medicine"]["time"] = "2026-11-12T15:00:00.000Z"
@@ -508,7 +512,7 @@ async def test_doses_fetched_on_change(
 
     freezer.tick(timedelta(minutes=16))
     await _poll(hass)
-    assert count() == 7
+    assert count() == 9  # the 1 before, then all eight
 
 
 async def test_medicine_added_and_removed(
@@ -810,3 +814,78 @@ def test_attribute_values() -> None:
     assert attribute_value("bath_type", "Bucket bath") == "Bucket bath"
     assert attribute_value("diaper_type", None) is None
     assert attribute_value("caretaker", "WET") == "WET"
+
+
+async def test_last_dirty_diaper(
+    hass: HomeAssistant,
+    loaded: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """The newest dirty (or wet and dirty) diaper, picked from the diaper list."""
+    dirty = hass.states.get("sensor.emma_last_dirty_diaper")
+    assert dirty.state == "2026-11-12T08:05:00+00:00"
+    assert dirty.attributes["diaper_type"] == "both"
+    assert _state(hass, "sensor.mia_last_dirty_diaper") == STATE_UNKNOWN
+
+    def count() -> int:
+        return sum(
+            call[0] == "GET" and "type=diaper" in str(call[1]) for call in aioclient_mock.mock_calls
+        )
+
+    # A new dirty diaper in the status: the list is fetched again
+    status = load("status")
+    status["data"]["lastActivities"]["diaper"].update(
+        id="diaper-4", time="2026-11-12T16:00:00.000Z", type="DIRTY"
+    )
+    activities = load("diaper_activities")
+    activities["data"]["activities"].insert(
+        0,
+        {
+            "activityType": "diaper",
+            "id": "diaper-4",
+            "time": "2026-11-12T16:00:00.000Z",
+            "details": {"type": "DIRTY"},
+            "caretakerName": "Anna",
+        },
+    )
+    mock_api(aioclient_mock, status_1=status, activities={"diaper": activities})
+    await _poll(hass)
+    assert count() == 1  # only Emma's
+    dirty = hass.states.get("sensor.emma_last_dirty_diaper")
+    assert dirty.state == "2026-11-12T16:00:00+00:00"
+    assert dirty.attributes["diaper_type"] == "dirty"
+    assert dirty.attributes["caretaker"] == "Anna"
+
+    # No new diaper: nothing fetched
+    await _poll(hass)
+    assert count() == 1
+
+
+def _diaper(diaper_id: str, time: str, diaper_type: str) -> dict:
+    return {"id": diaper_id, "time": time, "details": {"type": diaper_type}}
+
+
+def test_newest_dirty_diaper() -> None:
+    """A known dirty diaper is kept only while it is older than the fetched page."""
+    since = dt_util.parse_datetime("2026-10-13T00:00:00Z")
+    old = _diaper("d-old", "2026-10-01T10:00:00Z", "DIRTY")
+    wet = [
+        _diaper(f"w-{i}", f"2026-11-{12 - i // 10:02d}T{10 + i % 10:02d}:00:00Z", "WET")
+        for i in range(5)
+    ]
+
+    # Dirty ones in the page win, the newest of them
+    page = [
+        *wet,
+        _diaper("b", "2026-11-11T08:00:00Z", "BOTH"),
+        _diaper("d", "2026-11-10T08:00:00Z", "dirty"),
+    ]
+    assert newest_dirty_diaper(old, page, since, 50)["id"] == "b"
+    # None in a short page: it covers everything since `since`
+    assert newest_dirty_diaper(old, wet, since, 50) is old
+    assert newest_dirty_diaper(None, wet, since, 50) is None
+    inside = _diaper("d-in", "2026-11-01T10:00:00Z", "DIRTY")
+    assert newest_dirty_diaper(inside, wet, since, 50) is None  # deleted in Sprout Track
+    # None in a full page: it only covers back to its oldest diaper
+    assert newest_dirty_diaper(inside, wet, since, 5) is inside
+    assert newest_dirty_diaper(_diaper("x", "2026-11-12T11:30:00Z", "DIRTY"), wet, since, 5) is None

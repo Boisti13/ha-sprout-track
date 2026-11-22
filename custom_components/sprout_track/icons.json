@@ -3,6 +3,7 @@
     "sensor": {
       "last_feed": { "default": "mdi:baby-bottle-outline" },
       "last_diaper": { "default": "mdi:human-baby-changing-table" },
+      "last_dirty_diaper": { "default": "mdi:emoticon-poop" },
       "sleep_state": {
         "default": "mdi:sleep",
         "state": { "awake": "mdi:sleep-off", "night_sleep": "mdi:weather-night" }

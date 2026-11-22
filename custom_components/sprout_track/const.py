@@ -33,6 +33,13 @@ DOSE_STORE_VERSION = 1
 DOSE_STORE_DELAY = 10  # seconds to gather changes before writing the file
 FEED_HISTORY = timedelta(hours=24)  # covers today and the last 24 hours
 FEED_LIMIT = 50
+# Last dirty diaper: the status only names the last diaper of any kind, so
+# the diapers are fetched (when the status shows a new one, and with the
+# measurements) and the newest dirty one is picked out. One that is older
+# than everything fetched is kept from before (and saved across restarts).
+DIAPER_HISTORY = timedelta(days=30)
+DIAPER_LIMIT = 50
+DIRTY_DIAPER_TYPES = ("DIRTY", "BOTH")
 
 # A baby or medicine Sprout Track stops listing keeps its device and
 # entities (unavailable) this long before they are removed, so one odd

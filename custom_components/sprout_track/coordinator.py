@@ -27,6 +27,9 @@ from .api import (
 from .const import (
     CONF_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
+    DIAPER_HISTORY,
+    DIAPER_LIMIT,
+    DIRTY_DIAPER_TYPES,
     DOMAIN,
     DOSE_GAP_ISSUE_URL,
     DOSE_HISTORY,
@@ -77,6 +80,7 @@ class BabyData:
     reference: dict[str, Any] = field(default_factory=dict)
     doses: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     feeds: list[dict[str, Any]] = field(default_factory=list)
+    dirty_diaper: dict[str, Any] = field(default_factory=dict)
 
     @property
     def name(self) -> str:
@@ -179,6 +183,38 @@ def merge_doses(
     return [*fresh, *older]
 
 
+def newest_dirty_diaper(
+    cached: dict[str, Any] | None,
+    fresh: list[dict[str, Any]],
+    since: datetime,
+    limit: int,
+) -> dict[str, Any] | None:
+    """Return the newest dirty (or wet and dirty) diaper.
+
+    Taken from a fresh page of diapers; if it has none, the one known from
+    before is kept as long as it is older than everything the page covers
+    (since ``since``, or since the page's oldest diaper when it is full).
+    A known one inside that range was deleted or changed in Sprout Track.
+    """
+    dirty = [
+        (t, diaper)
+        for diaper in fresh
+        if str((diaper.get("details") or {}).get("type") or "").upper() in DIRTY_DIAPER_TYPES
+        and (t := dt_util.parse_datetime(str(diaper.get("time"))))
+    ]
+    if dirty:
+        return max(dirty, key=lambda pair: pair[0])[1]
+    if not cached:
+        return None
+    covered_from = since
+    if len(fresh) >= limit:
+        times = [t for d in fresh if (t := dt_util.parse_datetime(str(d.get("time"))))]
+        if times:
+            covered_from = min(times)
+    known = dt_util.parse_datetime(str(cached.get("time")))
+    return cached if known and known < covered_from else None
+
+
 def dose_store(hass: HomeAssistant, entry_id: str) -> Store[dict[str, Any]]:
     """Return the file the doses of a config entry are saved in."""
     return Store(hass, DOSE_STORE_VERSION, f"{DOMAIN}.{entry_id}.doses")
@@ -220,6 +256,9 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         self._feeds: dict[str, list[dict[str, Any]]] = {}
         # The last feed each fetch saw in the status (ID and time), per baby
         self._feed_marks: dict[str, Any] = {}
+        self._dirty_diapers: dict[str, dict[str, Any]] = {}
+        # The last diaper each fetch saw in the status, per baby
+        self._diaper_marks: dict[str, Any] = {}
         # Babies Sprout Track stopped listing, and since when (see REMOVE_AFTER)
         self.missing_since: dict[str, datetime] = {}
         self._store = dose_store(hass, entry.entry_id)
@@ -231,16 +270,20 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
             baby_id, _, kind = key.partition("|")
             if kind in DOSE_KINDS and isinstance(doses, list):
                 self._doses[(baby_id, kind)] = [d for d in doses if isinstance(d, dict)]
+        for baby_id, diaper in (saved.get("dirty_diapers") or {}).items():
+            if isinstance(diaper, dict):
+                self._dirty_diapers[baby_id] = diaper
 
     async def async_shutdown(self) -> None:
         """Write the doses now (on unload), not after the save delay."""
         await super().async_shutdown()
-        if self._doses:
+        if self._doses or self._dirty_diapers:
             await self._store.async_save(self._dose_store_data())
 
     def _dose_store_data(self) -> dict[str, Any]:
         return {
-            "doses": {f"{baby_id}|{kind}": doses for (baby_id, kind), doses in self._doses.items()}
+            "doses": {f"{baby_id}|{kind}": doses for (baby_id, kind), doses in self._doses.items()},
+            "dirty_diapers": self._dirty_diapers,
         }
 
     async def _async_update_data(self) -> dict[str, BabyData]:
@@ -271,6 +314,7 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
 
             await self._update_doses(ids, statuses, now, refresh=slow_due)
             await self._update_feeds(ids, statuses, now, refresh=slow_due)
+            await self._update_dirty_diapers(ids, statuses, now, refresh=slow_due)
         except SproutTrackAuthError as err:
             raise ConfigEntryAuthFailed(err.message) from err
         except SproutTrackRateLimitError as err:
@@ -297,6 +341,7 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
                 reference=self._references.get(baby_id, {}),
                 doses={kind: self._doses.get((baby_id, kind), []) for kind in DOSE_KINDS},
                 feeds=self._feeds.get(baby_id, []),
+                dirty_diaper=self._dirty_diapers.get(baby_id, {}),
             )
             for baby_id, baby, status in zip(ids, babies, statuses, strict=True)
         }
@@ -386,6 +431,52 @@ class SproutTrackCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         for baby_id in [baby_id for baby_id in self._feeds if baby_id not in ids]:
             del self._feeds[baby_id]
             self._feed_marks.pop(baby_id, None)
+
+    async def _update_dirty_diapers(
+        self,
+        ids: list[str],
+        statuses: list[dict[str, Any]],
+        now: datetime,
+        *,
+        refresh: bool,
+    ) -> None:
+        """Find the newest dirty diaper when the status shows a new diaper (or on refresh)."""
+        since_time = now - DIAPER_HISTORY
+        since = since_time.isoformat().replace("+00:00", "Z")
+        wanted: list[tuple[str, Any]] = []
+        for baby_id, status in zip(ids, statuses, strict=True):
+            diaper = (status.get("lastActivities") or {}).get("diaper") or {}
+            mark = (diaper.get("id"), diaper.get("time"), diaper.get("type"))
+            if refresh or baby_id not in self._diaper_marks or self._diaper_marks[baby_id] != mark:
+                wanted.append((baby_id, mark))
+        changed = False
+        if wanted:
+            results = await asyncio.gather(
+                *(
+                    self.client.get_activities(baby_id, "diaper", since, DIAPER_LIMIT)
+                    for baby_id, _ in wanted
+                )
+            )
+            for (baby_id, mark), diapers in zip(wanted, results, strict=True):
+                dirty = newest_dirty_diaper(
+                    self._dirty_diapers.get(baby_id), diapers, since_time, DIAPER_LIMIT
+                )
+                if dirty != self._dirty_diapers.get(baby_id):
+                    changed = True
+                if dirty:
+                    self._dirty_diapers[baby_id] = dirty
+                else:
+                    self._dirty_diapers.pop(baby_id, None)
+                self._diaper_marks[baby_id] = mark
+        # A baby that is only missing for now keeps its last dirty diaper
+        for baby_id in [
+            b for b in self._dirty_diapers if b not in ids and b not in self.missing_since
+        ]:
+            del self._dirty_diapers[baby_id]
+            self._diaper_marks.pop(baby_id, None)
+            changed = True
+        if changed:
+            self._store.async_delay_save(self._dose_store_data, DOSE_STORE_DELAY)
 
     def _check_dose_gap_support(self) -> None:
         """Explain in Repairs why *next dose* is missing, when the server can't send it.
